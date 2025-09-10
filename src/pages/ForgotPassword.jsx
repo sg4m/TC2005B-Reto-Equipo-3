@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Box, Typography, TextField, Button } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -68,29 +67,13 @@ const ForgotPassword = () => {
               style={{
                 height: '40px',
                 width: 'auto',
-                filter: 'brightness(0) invert(1)', // Makes the logo white
+                filter: 'brightness(0) invert(1)',
                 cursor: 'pointer'
               }}
             />
           </Box>
         </Box>
         
-        {/* Search Icon */}
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          padding: '8px',
-          borderRadius: '50%',
-          '&:hover': {
-            backgroundColor: 'rgba(255,255,255,0.1)'
-          }
-        }}>
-          <SearchIcon sx={{ 
-            color: 'white', 
-            fontSize: '32px' 
-          }} />
-        </Box>
       </Box>
 
       {/* Separator line */}
@@ -124,7 +107,8 @@ const ForgotPassword = () => {
               marginBottom: '40px',
               fontWeight: '400',
               color: '#333333',
-              fontSize: '28px'
+              fontSize: '28px',
+              fontFamily: 'Roboto, sans-serif'
             }}
           >
             Restablecer Contraseña
@@ -144,6 +128,7 @@ const ForgotPassword = () => {
                   backgroundColor: '#D3D3D3',
                   borderRadius: '6px',
                   height: '50px',
+                  fontFamily: 'Roboto, sans-serif',
                   '& fieldset': {
                     border: 'none',
                   },
@@ -158,11 +143,13 @@ const ForgotPassword = () => {
                   padding: '15px 16px',
                   fontSize: '16px',
                   color: '#333',
+                  fontFamily: 'Roboto, sans-serif',
                 },
                 '& .MuiInputBase-input::placeholder': {
                   color: '#666',
                   opacity: 1,
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  fontFamily: 'Roboto, sans-serif'
                 }
               }}
             />
@@ -171,18 +158,19 @@ const ForgotPassword = () => {
               type="submit"
               variant="contained"
               sx={{
-                backgroundColor: '#E53935',
+                backgroundColor: '#EB0029',
                 color: 'white',
                 paddingX: '40px',
                 paddingY: '12px',
                 borderRadius: '25px',
                 fontSize: '16px',
                 fontWeight: '500',
+                fontFamily: 'Roboto, sans-serif',
                 textTransform: 'none',
                 marginBottom: '30px',
                 minWidth: '120px',
                 '&:hover': {
-                  backgroundColor: '#D32F2F',
+                  backgroundColor: '#EB0029',
                 },
               }}
             >
@@ -194,7 +182,8 @@ const ForgotPassword = () => {
             variant="body2" 
             sx={{ 
               color: '#666666',
-              fontSize: '14px'
+              fontSize: '14px',
+              fontFamily: 'Roboto, sans-serif'
             }}
           >
             ¿Ya tienes una cuenta?{' '}
@@ -202,12 +191,13 @@ const ForgotPassword = () => {
               component="span"
               onClick={handleBackToLogin}
               sx={{
-                color: '#E53935',
+                color: '#EB0029',
                 cursor: 'pointer',
                 textDecoration: 'underline',
                 fontSize: '14px',
+                fontFamily: 'Roboto, sans-serif',
                 '&:hover': {
-                  color: '#D32F2F',
+                  color: '#EB0029',
                 }
               }}
             >
@@ -234,6 +224,7 @@ const ForgotPassword = () => {
             textTransform: 'none',
             fontSize: '14px',
             fontWeight: '400',
+            fontFamily: 'Roboto, sans-serif',
             '&:hover': {
               backgroundColor: '#BDBDBD',
             },
