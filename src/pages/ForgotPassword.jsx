@@ -50,7 +50,6 @@ const ForgotPassword = () => {
         left: 0,
         right: 0,
         zIndex: 1001,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {/* Banorte Logo */}
@@ -92,7 +91,7 @@ const ForgotPassword = () => {
         justifyContent: 'center',
         padding: { xs: '20px', sm: '40px 20px' },
         backgroundColor: '#ffffff',
-        minHeight: 'calc(100vh - 66px)' // Account for header height
+        minHeight: 'calc(100vh - 66px)' 
       }}>
         <Box sx={{ 
           width: '100%',
