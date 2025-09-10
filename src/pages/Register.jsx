@@ -1,43 +1,65 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Box, Typography, TextField, Button, Checkbox, FormControlLabel, Alert } from '@mui/material';
+import { Box, Typography, TextField, Button, Checkbox, FormControlLabel, Alert, MenuItem } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { useFormValidation } from '../hooks/useFormValidation';
+import { useNavigation } from '../hooks/useNavigation';
+import { useNotification } from '../hooks/useNotification';
+import { formHelpers, constants, utilityHelpers } from '../helpers';
 
 const Register = () => {
-  const [formData, setFormData] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Custom hooks
+  const { goToLogin } = useNavigation();
+  const { notification, showSuccess, showError } = useNotification();
+  const {
+    formData,
+    errors,
+    handleInputChange,
+    resetForm,
+    validateForm
+  } = useFormValidation({
     email: '',
     password: '',
     username: '',
     country: '',
     acceptPromotions: false
   });
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const navigate = useNavigate();
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Registration data:', formData);
     
-    // Show success message
-    setShowSuccessMessage(true);
-    
-    // Hide success message and redirect after 3 seconds
-    setTimeout(() => {
-      setShowSuccessMessage(false);
-      navigate('/login');
-    }, 3000);
-  };
+    // Validate form
+    if (!validateForm()) {
+      showError('Por favor corrige los errores en el formulario');
+      return;
+    }
 
-  const handleBackToLogin = () => {
-    navigate('/login');
+    setIsSubmitting(true);
+    
+    try {
+      // Clean form data before submission
+      const cleanedData = utilityHelpers.cleanFormData(formData);
+      
+      // Submit to backend (simulated)
+      const result = await formHelpers.submitRegistration(cleanedData);
+      
+      if (result.success) {
+        showSuccess(result.message);
+        resetForm();
+        
+        // Redirect after success
+        setTimeout(() => {
+          goToLogin();
+        }, 2000);
+      } else {
+        showError(result.message);
+      }
+    } catch (error) {
+      showError('Error inesperado al registrar usuario');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -85,7 +107,7 @@ const Register = () => {
             <img 
               src="/src/assets/LogoBanorte.svg" 
               alt="Banorte"
-              onClick={() => navigate('/login')}
+              onClick={goToLogin}
               style={{
                 height: '40px',
                 width: 'auto',
@@ -139,9 +161,9 @@ const Register = () => {
           textAlign: 'center',
           padding: { xs: '20px', sm: '30px' }
         }}>
-          {showSuccessMessage && (
+          {notification.show && (
             <Alert 
-              severity="success" 
+              severity={notification.type} 
               sx={{ 
                 marginBottom: '20px',
                 fontFamily: 'Roboto, sans-serif',
@@ -150,7 +172,7 @@ const Register = () => {
                 }
               }}
             >
-              ¡Datos insertados correctamente! Redirigiendo al inicio de sesión...
+              {notification.message}
             </Alert>
           )}
 
@@ -187,6 +209,8 @@ const Register = () => {
                 placeholder="Correo electrónico"
                 value={formData.email}
                 onChange={handleInputChange}
+                error={!!errors.email}
+                helperText={errors.email}
                 required
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -238,6 +262,8 @@ const Register = () => {
                 placeholder="Contraseña"
                 value={formData.password}
                 onChange={handleInputChange}
+                error={!!errors.password}
+                helperText={errors.password}
                 required
                 sx={{
                   marginBottom: '10px',
@@ -299,6 +325,8 @@ const Register = () => {
                 placeholder="Usuario"
                 value={formData.username}
                 onChange={handleInputChange}
+                error={!!errors.username}
+                helperText={errors.username}
                 required
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -345,11 +373,13 @@ const Register = () => {
               </Typography>
               <TextField
                 fullWidth
-                type="text"
+                select
                 name="country"
                 placeholder="País o región"
                 value={formData.country}
                 onChange={handleInputChange}
+                error={!!errors.country}
+                helperText={errors.country}
                 required
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -380,7 +410,13 @@ const Register = () => {
                     fontFamily: 'Roboto, sans-serif'
                   }
                 }}
-              />
+              >
+                {constants.COUNTRIES.map((country) => (
+                  <MenuItem key={country} value={country}>
+                    {country}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Box>
 
             {/* Checkbox for promotions */}
@@ -417,6 +453,7 @@ const Register = () => {
             <Button
               type="submit"
               variant="contained"
+              disabled={isSubmitting}
               sx={{
                 backgroundColor: '#EB0029',
                 color: 'white',
@@ -433,9 +470,13 @@ const Register = () => {
                 '&:hover': {
                   backgroundColor: '#D32F2F',
                 },
+                '&:disabled': {
+                  backgroundColor: '#ccc',
+                  color: '#666'
+                }
               }}
             >
-              Registrate
+              {isSubmitting ? 'Registrando...' : 'Registrate'}
             </Button>
           </form>
 
@@ -450,7 +491,7 @@ const Register = () => {
             ¿Ya estas registrado?{' '}
             <Typography
               component="span"
-              onClick={handleBackToLogin}
+              onClick={goToLogin}
               sx={{
                 color: '#EB0029',
                 cursor: 'pointer',
