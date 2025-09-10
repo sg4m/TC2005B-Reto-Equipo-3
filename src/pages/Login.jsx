@@ -5,9 +5,17 @@ import { Button } from '@mui/material';
 const Login = () => {
   const navigate = useNavigate();
 
+const Register = () => {
+  const navigate = useNavigate();
+}
+
   const handleForgotPassword = () => {
     navigate('/forgot-password');
   };
+
+  const handleRegister = () => {
+    navigate('/Register');
+  }
 
   return (
     <div style={{ padding: '20px' }}>
@@ -25,6 +33,21 @@ const Login = () => {
       >
         Go to Forgot Password (Test)
       </Button>
+
+      <Button
+        variant="contained"
+        onClick={handleRegister}
+        sx={{
+          backgroundColor: '#E53935',
+          color: 'white',
+          '&:hover': {
+            backgroundColor: '#D32F2F',
+          },
+        }}
+      >
+        Go to Register(Test)
+      </Button>
+
     </div>
   );
 };
