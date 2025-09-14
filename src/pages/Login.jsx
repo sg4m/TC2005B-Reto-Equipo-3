@@ -9,12 +9,20 @@ const Register = () => {
   const navigate = useNavigate();
 }
 
+const Dashboard = () => {
+  const navigate = useNavigate();
+}
+
   const handleForgotPassword = () => {
     navigate('/forgot-password');
   };
 
   const handleRegister = () => {
     navigate('/Register');
+  }
+
+  const handleDashboard = () => {
+    navigate('/Dashboard');
   }
 
   return (
@@ -46,6 +54,20 @@ const Register = () => {
         }}
       >
         Go to Register(Test)
+
+      </Button>
+      <Button
+        variant="contained"
+        onClick={handleDashboard}
+        sx={{
+          backgroundColor: '#E53935',
+          color: 'white',
+          '&:hover': {
+            backgroundColor: '#D32F2F',
+          },
+        }}
+      >
+        Go to Dashboard(Test)
       </Button>
 
     </div>
