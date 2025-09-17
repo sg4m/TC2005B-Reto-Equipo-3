@@ -28,37 +28,6 @@
    ```
 
 3. Connect to the database and create the tables:
-   ```sql
-   -- Users table for authentication
-   CREATE TABLE Usuario (
-       id SERIAL PRIMARY KEY,
-       email VARCHAR(255) UNIQUE NOT NULL,
-       password VARCHAR(255) NOT NULL,
-       username VARCHAR(100) NOT NULL,
-       country VARCHAR(100),
-       accept_promotions BOOLEAN DEFAULT false,
-       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-   );
-
-   -- Business Rules table
-   CREATE TABLE ReglaNegocio (
-       id SERIAL PRIMARY KEY,
-       nombre VARCHAR(255) NOT NULL,
-       descripcion TEXT,
-       archivo_datos VARCHAR(500),
-       respuesta_ia JSONB,
-       estado VARCHAR(50) DEFAULT 'pendiente',
-       usuario_id INTEGER REFERENCES Usuario(id),
-       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-   );
-   ```
-
-### 3. Install Dependencies
-```bash
-npm install
-```
 
 ### 4. Run the Server
 ```bash
