@@ -1,7 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const csv = require('csv-parser');
 const db = require('../config/database');
+const geminiService = require('../services/geminiService');
 const router = express.Router();
 
 // Configure multer for file uploads
@@ -33,55 +36,123 @@ const upload = multer({
   }
 });
 
-// Generate business rule
+// Generate business rule with Gemini AI
 router.post('/generate', upload.single('archivo'), async (req, res) => {
   try {
-    const { id_usuario, resumen } = req.body;
+    const { usuario_id, nombre, descripcion, prompt_texto } = req.body;
     
-    if (!id_usuario || !resumen) {
+    if (!usuario_id || (!prompt_texto && !req.file)) {
       return res.status(400).json({ 
-        error: 'ID de usuario y resumen son requeridos' 
+        error: 'Usuario ID y al menos un prompt de texto o archivo son requeridos' 
       });
     }
 
-    // File path (if uploaded)
-    const archivoOriginal = req.file ? req.file.path : null;
+    let aiResponse;
+    let archivoPath = null;
 
-    // TODO: Here you'll integrate with AI service
-    // For now, we'll create a mock response
-    const mockAIResponse = {
-      regla_id: Date.now(),
-      condiciones: [
-        {
-          campo: "monto",
-          operador: ">",
-          valor: 10000
-        }
-      ],
-      acciones: [
-        {
-          tipo: "alerta",
-          mensaje: "Transacción de alto valor detectada"
-        }
-      ],
-      generado_por: "AI_Mock",
-      fecha_generacion: new Date().toISOString()
-    };
+    try {
+      if (req.file) {
+        // Process CSV file
+        archivoPath = req.file.path;
+        const csvData = [];
+        
+        // Parse CSV file
+        await new Promise((resolve, reject) => {
+          fs.createReadStream(archivoPath)
+            .pipe(csv())
+            .on('data', (data) => csvData.push(data))
+            .on('end', resolve)
+            .on('error', reject);
+        });
 
-    // Insert into database
-    const result = await db.query(
-      'INSERT INTO ReglaNegocio (id_usuario, status, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [id_usuario, 'Activa', resumen, archivoOriginal, JSON.stringify(mockAIResponse)]
-    );
+        // Generate business rules from CSV data
+        aiResponse = await geminiService.generateBusinessRulesFromData(csvData, prompt_texto || '');
+        
+      } else {
+        // Generate business rules from text prompt only
+        aiResponse = await geminiService.generateBusinessRulesFromPrompt(prompt_texto);
+      }
 
-    res.status(201).json({
-      message: 'Regla de negocio generada exitosamente',
-      regla: result.rows[0]
-    });
+      // Insert into database with correct column names
+      const result = await db.query(
+        'INSERT INTO ReglaNegocio (id_usuario, status, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [
+          usuario_id,
+          'Activa',
+          descripcion || prompt_texto || 'Regla generada por IA',
+          archivoPath,
+          JSON.stringify(aiResponse)
+        ]
+      );
+
+      // Update AI response rule IDs to match database ID
+      if (aiResponse && aiResponse.rules) {
+        const dbId = result.rows[0].id_regla;
+        aiResponse.rules = aiResponse.rules.map((rule, index) => ({
+          ...rule,
+          id: `rule_${dbId}_${index + 1}`
+        }));
+
+        // Update the database with the corrected rule IDs
+        await db.query(
+          'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+          [JSON.stringify(aiResponse), dbId]
+        );
+      }
+
+      res.status(201).json({
+        message: 'Regla de negocio generada exitosamente con Gemini AI',
+        regla: result.rows[0],
+        ai_response: aiResponse
+      });
+
+    } catch (aiError) {
+      console.error('Error with AI generation:', aiError);
+      
+      // If AI fails, still save the request but with error status
+      const errorResponse = { 
+        error: aiError.message,
+        rules: [{
+          id: `rule_error_${Date.now()}`,
+          title: "Error en generación",
+          description: "Hubo un error al generar la regla con IA",
+          conditions: ["Error de conectividad"],
+          actions: ["Reintentar generación"],
+          priority: "high",
+          category: "error"
+        }]
+      };
+
+      const result = await db.query(
+        'INSERT INTO ReglaNegocio (id_usuario, status, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [
+          usuario_id,
+          'Inactiva',
+          descripcion || prompt_texto || 'Regla con Error de IA',
+          archivoPath,
+          JSON.stringify(errorResponse)
+        ]
+      );
+
+      // Update error rule ID to match database ID
+      const dbId = result.rows[0].id_regla;
+      errorResponse.rules[0].id = `rule_${dbId}_error`;
+      
+      await db.query(
+        'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+        [JSON.stringify(errorResponse), dbId]
+      );
+
+      res.status(201).json({
+        message: 'Regla guardada, pero hubo un error con la generación de IA',
+        regla: result.rows[0],
+        error: aiError.message
+      });
+    }
 
   } catch (error) {
     console.error('Error generating rule:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
   }
 });
 
@@ -135,21 +206,69 @@ router.get('/movements/:id_usuario', async (req, res) => {
   }
 });
 
-// Update rule status
-router.patch('/:id_regla/status', async (req, res) => {
+// Refine existing business rule with Gemini AI
+router.post('/:id/refine', async (req, res) => {
   try {
-    const { id_regla } = req.params;
-    const { status } = req.body;
+    const { id } = req.params;
+    const { feedback } = req.body;
 
-    if (!['Activa', 'Inactiva'].includes(status)) {
+    if (!feedback) {
       return res.status(400).json({ 
-        error: 'Status debe ser "Activa" o "Inactiva"' 
+        error: 'Feedback es requerido para refinar la regla' 
+      });
+    }
+
+    // Get existing rule
+    const existingRule = await db.query(
+      'SELECT * FROM ReglaNegocio WHERE id_regla = $1',
+      [id]
+    );
+
+    if (existingRule.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Regla no encontrada' 
+      });
+    }
+
+    const rule = existingRule.rows[0];
+    const currentAIResponse = rule.regla_estandarizada;
+
+    // Refine with Gemini AI
+    const refinedResponse = await geminiService.refineBusinessRules(currentAIResponse, feedback);
+
+    // Update rule in database
+    const result = await db.query(
+      'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2 RETURNING *',
+      [JSON.stringify(refinedResponse), id]
+    );
+
+    res.json({
+      message: 'Regla refinada exitosamente con Gemini AI',
+      regla: result.rows[0],
+      refined_response: refinedResponse
+    });
+
+  } catch (error) {
+    console.error('Error refining rule:', error);
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+  }
+});
+
+// Update rule status
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    if (!['Activa', 'Inactiva'].includes(estado)) {
+      return res.status(400).json({ 
+        error: 'Estado debe ser "Activa" o "Inactiva"' 
       });
     }
 
     const result = await db.query(
       'UPDATE ReglaNegocio SET status = $1 WHERE id_regla = $2 RETURNING *',
-      [status, id_regla]
+      [estado, id]
     );
 
     if (result.rows.length === 0) {
@@ -159,7 +278,7 @@ router.patch('/:id_regla/status', async (req, res) => {
     }
 
     res.json({
-      message: 'Status actualizado exitosamente',
+      message: 'Estado actualizado exitosamente',
       regla: result.rows[0]
     });
 

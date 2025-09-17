@@ -42,17 +42,22 @@ npm start
 
 ### Health Check
 - `GET /health` - Check server and database status
+- `GET /api/health` - Detailed health check with database test
 
 ### Authentication
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
 
-### Business Rules
-- `GET /api/rules` - Get all business rules
-- `POST /api/rules` - Create new business rule (with file upload)
-- `GET /api/rules/:id` - Get specific rule
-- `PUT /api/rules/:id` - Update rule  
-- `DELETE /api/rules/:id` - Delete rule
+### Business Rules (with Gemini AI)
+- `POST /api/rules/generate` - Generate business rules using Gemini AI (supports text prompts and CSV file uploads)
+- `GET /api/rules/user/:usuario_id` - Get user's business rules
+- `GET /api/rules/movements/:usuario_id` - Get recent rule movements for dashboard
+- `POST /api/rules/:id/refine` - Refine existing rules with Gemini AI feedback
+- `PATCH /api/rules/:id/status` - Update rule status
+
+### AI Integration (Gemini)
+- `GET /api/ai/gemini-info` - Check Gemini AI configuration and capabilities
+- `POST /api/ai/test-gemini` - Test Gemini AI with a custom prompt
 
 ## Security Notes
 
@@ -67,3 +72,46 @@ npm start
 - Maximum file size: 10MB
 - Upload directory: `./uploads/`
 - Files are validated for type and size
+
+## Gemini AI Integration
+
+### Features
+- **Text-to-Rules**: Generate business rules from natural language prompts
+- **CSV Analysis**: Analyze CSV files and generate relevant business rules
+- **Rule Refinement**: Improve existing rules based on user feedback
+- **Banking Focus**: Specialized in generating rules for:
+  - Fraud detection
+  - Risk management  
+  - Compliance requirements
+  - Customer service
+  - Data validation
+
+### Usage Examples
+
+#### Generate Rules from Text:
+```bash
+POST /api/rules/generate
+{
+  "usuario_id": 1,
+  "nombre": "Fraud Detection Rule",
+  "prompt_texto": "Create a rule to detect suspicious transactions over $10,000"
+}
+```
+
+#### Generate Rules from CSV:
+```bash
+POST /api/rules/generate
+Content-Type: multipart/form-data
+- archivo: [CSV file]
+- usuario_id: 1
+- nombre: "Transaction Analysis"
+- prompt_texto: "Analyze this transaction data for risk patterns"
+```
+
+#### Refine Existing Rules:
+```bash
+POST /api/rules/123/refine
+{
+  "feedback": "Make the rule more strict for international transactions"
+}
+```
