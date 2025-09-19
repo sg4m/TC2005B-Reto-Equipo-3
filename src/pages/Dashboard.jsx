@@ -26,6 +26,9 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
   LinearProgress,
   Alert,
   Snackbar,
@@ -38,6 +41,7 @@ import {
   Menu as MenuIcon,
   AccountCircle as AccountCircleIcon,
   Notifications as NotificationsIcon,
+  Key as KeyIcon,
   AttachFile as AttachFileIcon,
   Send as SendIcon,
   Dashboard as DashboardIcon,
@@ -72,6 +76,13 @@ const Dashboard = () => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  
+  // Change password dialog states
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   
   // File upload states
   const [selectedFile, setSelectedFile] = useState(null);
@@ -132,6 +143,20 @@ const Dashboard = () => {
   // Load movements on component mount
   useEffect(() => {
     loadMovements();
+    
+    // Load notifications from localStorage (from other pages like ForgotPassword)
+    const storedNotifications = JSON.parse(localStorage.getItem('dashboardNotifications') || '[]');
+    if (storedNotifications.length > 0) {
+      setNotifications(prev => {
+        // Merge stored notifications with existing ones, avoiding duplicates
+        const existingIds = prev.map(n => n.id);
+        const newNotifications = storedNotifications.filter(n => !existingIds.includes(n.id));
+        return [...newNotifications, ...prev];
+      });
+      
+      // Clear stored notifications after loading
+      localStorage.removeItem('dashboardNotifications');
+    }
   }, [loadMovements]);
 
   // Check authentication status on component mount
@@ -269,6 +294,66 @@ const Dashboard = () => {
 
   const handleProfileClose = () => {
     setProfileOpen(false);
+  };
+
+  // Change password handlers
+  const handleChangePasswordOpen = () => {
+    setChangePasswordOpen(true);
+    setProfileOpen(false); // Close profile popup when opening change password
+  };
+
+  const handleChangePasswordClose = () => {
+    setChangePasswordOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleChangePasswordSubmit = async () => {
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showError('Por favor completa todos los campos');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showError('Las contraseñas nuevas no coinciden');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      showError('La nueva contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      showError('La nueva contraseña debe ser diferente a la actual');
+      return;
+    }
+
+    setChangePasswordLoading(true);
+
+    try {
+      const result = await authService.changePassword(currentPassword, newPassword);
+      
+      if (result.success) {
+        showSuccess('¡Contraseña cambiada exitosamente!');
+        handleChangePasswordClose();
+        
+        // Add to notification bell system
+        addNotification(
+          'success',
+          'Contraseña Actualizada',
+          'Tu contraseña ha sido cambiada exitosamente por motivos de seguridad.'
+        );
+      } else {
+        showError(result.message);
+      }
+    } catch (error) {
+      showError('Error al cambiar la contraseña. Intenta nuevamente.');
+    } finally {
+      setChangePasswordLoading(false);
+    }
   };
 
   // File handling functions
@@ -1083,6 +1168,25 @@ const Dashboard = () => {
                       fullWidth
                       variant="text"
                       size="small"
+                      startIcon={<KeyIcon />}
+                      onClick={handleChangePasswordOpen}
+                      sx={{
+                        color: '#EB0029',
+                        textTransform: 'none',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        mb: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(235, 0, 41, 0.04)'
+                        }
+                      }}
+                    >
+                      Cambiar Contraseña
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="text"
+                      size="small"
                       onClick={() => {
                         handleProfileClose();
                         handleLogoutClick();
@@ -1255,8 +1359,114 @@ const Dashboard = () => {
         )}
       </Popper>
 
-      {/* Snackbar for notifications */}
-
+      {/* Change Password Dialog */}
+      <Dialog 
+        open={changePasswordOpen} 
+        onClose={handleChangePasswordClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1,
+          fontSize: '18px',
+          fontWeight: 600
+        }}>
+          <KeyIcon sx={{ color: '#EB0029' }} />
+          Cambiar Contraseña
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 3, color: '#666' }}>
+            Para tu seguridad, ingresa tu contraseña actual y luego la nueva contraseña.
+          </DialogContentText>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <FormControl variant="outlined" fullWidth>
+              <InputLabel htmlFor="current-password">Contraseña Actual</InputLabel>
+              <OutlinedInput
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={changePasswordLoading}
+                label="Contraseña Actual"
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#EB0029',
+                  }
+                }}
+              />
+            </FormControl>
+            
+            <FormControl variant="outlined" fullWidth>
+              <InputLabel htmlFor="new-password">Nueva Contraseña</InputLabel>
+              <OutlinedInput
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={changePasswordLoading}
+                label="Nueva Contraseña"
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#EB0029',
+                  }
+                }}
+              />
+            </FormControl>
+            
+            <FormControl variant="outlined" fullWidth>
+              <InputLabel htmlFor="confirm-password">Confirmar Nueva Contraseña</InputLabel>
+              <OutlinedInput
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={changePasswordLoading}
+                label="Confirmar Nueva Contraseña"
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#EB0029',
+                  }
+                }}
+              />
+            </FormControl>
+          </Box>
+          
+          <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+            <Typography variant="body2" sx={{ fontSize: '12px', color: '#666' }}>
+              <strong>Requisitos de la contraseña:</strong>
+              <br />• Mínimo 8 caracteres
+              <br />• Diferente a tu contraseña actual
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button 
+            onClick={handleChangePasswordClose}
+            disabled={changePasswordLoading}
+            sx={{ 
+              color: '#666',
+              '&:hover': { backgroundColor: '#f0f0f0' }
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleChangePasswordSubmit}
+            variant="contained"
+            disabled={changePasswordLoading || !currentPassword || !newPassword || !confirmPassword}
+            sx={{ 
+              bgcolor: '#EB0029',
+              '&:hover': { bgcolor: '#D32F2F' },
+              '&:disabled': { bgcolor: '#ccc' }
+            }}
+          >
+            {changePasswordLoading ? 'Cambiando...' : 'Cambiar Contraseña'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Logout Dialog */}
       <Dialog open={logoutDialogOpen} onClose={handleLogoutCancel}>

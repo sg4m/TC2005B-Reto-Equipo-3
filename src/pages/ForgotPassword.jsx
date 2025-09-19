@@ -1,17 +1,77 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, TextField, Button } from '@mui/material';
+import { Container, Box, Typography, TextField, Button, Alert, CircularProgress, Snackbar } from '@mui/material';
+import { useNotification } from '../hooks/useNotification';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { notification, showSuccess, showError, showInfo } = useNotification();
 
-  const handleContinue = (e) => {
+  const handleContinue = async (e) => {
     e.preventDefault();
+    
+    if (!email) {
+      setError('Por favor ingresa tu correo electrónico');
+      return;
+    }
 
-    console.log('Reset password for:', email);
+    setIsLoading(true);
+    setError('');
+    setResetMessage('');
 
-    navigate('/login');
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResetMessage(`¡Contraseña restablecida exitosamente! Tu nueva contraseña temporal es: ${data.tempPassword}`);
+        setEmail(''); // Clear email field
+        
+        // Show notification for successful password reset
+        showSuccess('Tu contraseña ha sido restablecida exitosamente. Usa "password123" para iniciar sesión.', 5000);
+        
+        // Show info notification about security
+        setTimeout(() => {
+          showInfo('Por seguridad, te recomendamos cambiar tu contraseña después de iniciar sesión.', 6000);
+        }, 1000);
+
+        // Add notification to Dashboard notification system (via localStorage)
+        const dashboardNotification = {
+          id: Date.now(),
+          type: 'warning',
+          title: 'Contraseña Restablecida',
+          message: 'Se restableció tu contraseña a una temporal por seguridad.',
+          timestamp: new Date(),
+          read: false
+        };
+        
+        // Store in localStorage for Dashboard to pick up
+        const existingNotifications = JSON.parse(localStorage.getItem('dashboardNotifications') || '[]');
+        existingNotifications.unshift(dashboardNotification);
+        localStorage.setItem('dashboardNotifications', JSON.stringify(existingNotifications));
+      } else {
+        setError(data.error || 'Error al procesar la solicitud');
+        showError(data.error || 'Error al procesar la solicitud de restablecimiento');
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      const errorMessage = 'Error de conexión. Por favor intenta nuevamente.';
+      setError(errorMessage);
+      showError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBackToLogin = () => {
@@ -113,6 +173,40 @@ const ForgotPassword = () => {
             Restablecer Contraseña
           </Typography>
 
+          {/* Success Message */}
+          {resetMessage && (
+            <Alert 
+              severity="success" 
+              sx={{ 
+                marginBottom: '30px',
+                textAlign: 'left',
+                '& .MuiAlert-message': {
+                  fontFamily: 'Roboto, sans-serif',
+                  fontSize: '14px'
+                }
+              }}
+            >
+              {resetMessage}
+            </Alert>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <Alert 
+              severity="error" 
+              sx={{ 
+                marginBottom: '30px',
+                textAlign: 'left',
+                '& .MuiAlert-message': {
+                  fontFamily: 'Roboto, sans-serif',
+                  fontSize: '14px'
+                }
+              }}
+            >
+              {error}
+            </Alert>
+          )}
+
           <form onSubmit={handleContinue}>
             <TextField
               fullWidth
@@ -156,6 +250,7 @@ const ForgotPassword = () => {
             <Button
               type="submit"
               variant="contained"
+              disabled={isLoading}
               sx={{
                 backgroundColor: '#EB0029',
                 color: 'white',
@@ -171,9 +266,16 @@ const ForgotPassword = () => {
                 '&:hover': {
                   backgroundColor: '#EB0029',
                 },
+                '&:disabled': {
+                  backgroundColor: '#CCCCCC',
+                },
               }}
             >
-              Continuar
+              {isLoading ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                'Continuar'
+              )}
             </Button>
           </form>
 
@@ -232,6 +334,20 @@ const ForgotPassword = () => {
           Regresar a inicio de sesión
         </Button>
       </Box>
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.show}
+        autoHideDuration={notification.duration}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          severity={notification.type}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -12,10 +12,11 @@ import Link from '@mui/material/Link';
 import Button from '@mui/material/Button';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
-import { IconButton, InputAdornment } from '@mui/material';
+import { IconButton, InputAdornment, Snackbar, Alert } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
+import { useNotification } from '../hooks/useNotification';
 import authService from '../services/authService';
 
 import './Login.css'
@@ -24,6 +25,7 @@ import './Login.css'
 
 const Login = () => {
     const { goToDashboard, goToRegister, goToForgotPassword } = useNavigation();
+    const { notification, showSuccess, showError, showWarning } = useNotification();
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [loading, setLoading] = React.useState(false);
@@ -37,7 +39,7 @@ const Login = () => {
         e.preventDefault();
         
         if (!email || !password) {
-            alert('Por favor, completa todos los campos');
+            showError('Por favor, completa todos los campos');
             return;
         }
 
@@ -51,13 +53,36 @@ const Login = () => {
             });
 
             if (result.success) {
+                // Check if user is logging in with temporary password
+                if (password === 'password123') {
+                    showWarning('¡Estás usando una contraseña temporal! Por seguridad, cámbiala después de iniciar sesión.', 7000);
+                    
+                    // Add notification to Dashboard system
+                    const dashboardNotification = {
+                        id: Date.now(),
+                        type: 'warning',
+                        title: 'Contraseña Temporal Detectada',
+                        message: 'Iniciaste sesión con una contraseña temporal. Cámbiala desde tu perfil.',
+                        timestamp: new Date(),
+                        read: false
+                    };
+                    
+                    const existingNotifications = JSON.parse(localStorage.getItem('dashboardNotifications') || '[]');
+                    existingNotifications.unshift(dashboardNotification);
+                    localStorage.setItem('dashboardNotifications', JSON.stringify(existingNotifications));
+                } else {
+                    showSuccess('¡Bienvenido! Iniciando sesión...', 2000);
+                }
+                
                 // User is now logged in and data is stored in localStorage
-                goToDashboard();
+                setTimeout(() => {
+                    goToDashboard();
+                }, 1500);
             } else {
-                alert(result.message || 'Error al iniciar sesión');
+                showError(result.message || 'Error al iniciar sesión');
             }
         } catch (error) {
-            alert('Error de conexión. Intenta nuevamente.');
+            showError('Error de conexión. Intenta nuevamente.');
             console.error('Login error:', error);
         } finally {
             setLoading(false);
@@ -297,6 +322,20 @@ const Login = () => {
                     </Typography>
                 </Stack>
             </Stack>
+
+            {/* Notification Snackbar */}
+            <Snackbar
+                open={notification.show}
+                autoHideDuration={notification.duration}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    severity={notification.type}
+                    sx={{ width: '100%' }}
+                >
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </React.Fragment>
     )
 }

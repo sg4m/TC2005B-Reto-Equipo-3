@@ -132,6 +132,52 @@ class AuthService {
   isAuthenticated() {
     return localStorage.getItem('isLoggedIn') === 'true' && localStorage.getItem('user') !== null;
   }
+
+  // Change password for current user
+  async changePassword(currentPassword, newPassword) {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser) {
+        throw new Error('No hay usuario autenticado');
+      }
+
+      console.log('🔐 Frontend change password attempt for user:', currentUser.id_usuario);
+      console.log('🌐 API URL:', `${this.baseURL}/auth/change-password`);
+      
+      const response = await fetch(`${this.baseURL}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUser.id_usuario,
+          currentPassword: currentPassword,
+          newPassword: newPassword
+        }),
+      });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+      
+      const data = await response.json();
+      console.log('📦 Response data:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cambiar la contraseña');
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Contraseña cambiada exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Change password error:', error);
+      return {
+        success: false,
+        message: error.message || 'Error de conexión'
+      };
+    }
+  }
 }
 
 // Create singleton instance
