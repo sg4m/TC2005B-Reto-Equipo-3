@@ -12,8 +12,9 @@ import Link from '@mui/material/Link';
 import Button from '@mui/material/Button';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
-import { IconButton } from '@mui/material';
+import { IconButton, InputAdornment } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
 
 import './Login.css'
@@ -25,6 +26,11 @@ const Login = () => {
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [showPassword, setShowPassword] = React.useState(false);
+
+    const handleTogglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -54,24 +60,24 @@ const Login = () => {
             <Box className="fondo-login"
                 sx={{
                     position: 'fixed',
-                    top: 64,
+                    top: 32,
                     left: 0,
                     backgroundImage: "url('/src/assets/FondoLogin.svg')",
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    height: '60vh',
+                    height: '55vh',
                     width: '100vw',
                     zIndex: 0
                 }}
             />
-            <AppBar position="fixed" sx={{ bgcolor: '#EB0029', boxShadow: 0, backgroundImage: "url('/src/assets/HeaderBanorte.svg')", backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 1300 }}>
+            <AppBar position="fixed" sx={{ bgcolor: '#EB0029', boxShadow: 0, backgroundImage: "url('/src/assets/HeaderBanorte.svg')", backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 1300, cursor: 'pointer' }} onClick={() => setActiveSection('Login')}>
                 <Toolbar>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <img 
                             src="/src/assets/LogoBanorte.svg" 
                             alt="Banorte"
                             style={{
-                                height: '40px',
+                                height: '30px',
                                 width: 'auto',
                                 filter: 'brightness(0) invert(1)'
                             }}
@@ -87,16 +93,18 @@ const Login = () => {
                 position: 'fixed',
                 width: 400,
                 height: 380,
-                borderRadius: '16px',
-                bgcolor: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '8px',
+                bgcolor: 'white',
                 zIndex: 10,
                 left: '80px',
                 top: '120px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                padding: 3,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                padding: '20px',
+                border: '1px solid #e0e0e0'
+            
             }}>
-                <Typography variant="h5" align="center" sx={{ mb: 3, fontWeight: 600, color: '#333', fontFamily: 'Roboto' }}>
-                    Ingresa Aquí
+                <Typography variant="h5" align="center" sx={{ mb: 1, fontWeight: 500, color: '#333', fontFamily: 'Roboto' }}>
+                    Ingresa aquí
                 </Typography>
                 <TextField
                     required
@@ -108,12 +116,26 @@ const Login = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
-                    sx={{ mb: 2 }}
+                    sx={{ 
+                        mb: 2,
+                        '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'white',
+                            '& fieldset': {
+                                borderColor: '#ddd',
+                            },
+                            '&:hover fieldset': {
+                                borderColor: '#bbb',
+                            },
+                            '&.Mui-focused fieldset': {
+                                borderColor: '#EB0029',
+                            }
+                        }
+                    }}
                 />
                 <TextField
                     required
                     label="Contraseña"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     variant="outlined"
                     fullWidth
                     margin="normal"
@@ -125,9 +147,37 @@ const Login = () => {
                             handleLogin(e);
                         }
                     }}
-                    sx={{ mb: 2 }}
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    onClick={handleTogglePasswordVisibility}
+                                    edge="end"
+                                    disabled={loading}
+                                    sx={{ color: '#666' }}
+                                >
+                                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                            </InputAdornment>
+                        ),
+                    }}
+                    sx={{ 
+                        mb: 2,
+                        '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'white',
+                            '& fieldset': {
+                                borderColor: '#ddd',
+                            },
+                            '&:hover fieldset': {
+                                borderColor: '#bbb',
+                            },
+                            '&.Mui-focused fieldset': {
+                                borderColor: '#EB0029',
+                            }
+                        }
+                    }}
                 />
-                <Box sx={{ textAlign: 'center', mb: 2, borderRadius: '4px' }}>
+                <Box sx={{ textAlign: 'left', mb: 2, borderRadius: '4px' }}>
                     <Link 
                         onClick={(e) => {
                             e.preventDefault();
@@ -143,26 +193,28 @@ const Login = () => {
                         ¿Olvidaste tu contraseña?
                     </Link>
                 </Box>
-                <Button 
-                    variant="contained" 
-                    fullWidth
-                    disableElevation
-                    disabled={loading}
-                    onClick={handleLogin}
-                    sx={{ 
-                        bgcolor: '#EB0029', 
-                        py: 1.5, 
-                        mb: 2,
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        borderRadius: '8px',
-                        '&:hover': { bgcolor: '#dd2a2aff' },
-                        '&:disabled': { bgcolor: '#ccc' }
-                    }}
-                >
-                    {loading ? 'Iniciando...' : 'Iniciar sesión'}
-                </Button>
-                <Typography variant="body2" align="center" sx={{ color: '#666' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+                    <Button 
+                        variant="contained"
+                        disableElevation
+                        disabled={loading}
+                        onClick={handleLogin}
+                        sx={{ 
+                            bgcolor: '#EB0029', 
+                            py: 1.5,
+                            px: 3,
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            borderRadius: '4px',
+                            textTransform: 'uppercase',
+                            '&:hover': { bgcolor: '#d4002a' },
+                            '&:disabled': { bgcolor: '#ccc' }
+                        }}
+                    >
+                        {loading ? 'Iniciando...' : 'INICIAR SESIÓN'}
+                    </Button>
+                </Box>
+                <Typography variant="body2" align="left" sx={{ color: '#666' }}>
                     ¿No tienes cuenta? <Link 
                         onClick={(e) => {
                             e.preventDefault();
@@ -185,53 +237,54 @@ const Login = () => {
                 bottom: 0,
                 left: 0,
                 width: '100vw',
-                height: '40vh',
+                height: '45vh',
                 backgroundColor: 'white',
                 zIndex: 5
             }} />
             
-            <Stack direction="row" spacing={12} sx={{ 
+            <Stack direction="row" spacing={20} sx={{ 
                 justifyContent: "center", 
                 alignItems: "center", 
                 position: "fixed", 
                 bottom: 0, 
                 left: 0,
                 right: 0,
-                height: '40vh',
+                height: '45vh',
                 zIndex: 10,
-                paddingY: 4
+                paddingY: 6,
+                paddingX: 8
             }}>
-                <Stack direction="column" alignItems="center" spacing={2}>
-                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 120, height: 120, boxShadow: 2 }}>
-                        <AccountBoxIcon sx={{ color: '#333', width: 60, height: 60 }} />
+                <Stack direction="column" alignItems="center" spacing={3}>
+                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
+                        <AccountBoxIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>
-                    <Typography variant="h6" align="center" sx={{ fontWeight: 700, color: '#333' }}>
-                        Paso 1
+                    <Typography variant="h3" align="center" sx={{ fontWeight: 700, color: '#333', fontSize: '2.5rem' }}>
+                        Primeros Pasos
                     </Typography>
-                    <Typography variant="body2" align="center" sx={{ color: '#666', maxWidth: '120px' }}>
-                        Crea tu cuenta / Inicia sesión
+                    <Typography variant="h6" align="center" sx={{ color: '#666', maxWidth: '220px', fontWeight: 400, lineHeight: 1.4 }}>
+                        Crea tu cuenta o inicia sesión
                     </Typography>
                 </Stack>
-                <Stack direction="column" alignItems="center" spacing={2}>
-                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 120, height: 120, boxShadow: 2 }}>
-                        <DrawIcon sx={{ color: '#333', width: 60, height: 60 }} />
+                <Stack direction="column" alignItems="center" spacing={3}>
+                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
+                        <DrawIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>
-                    <Typography variant="h6" align="center" sx={{ fontWeight: 700, color: '#333' }}>
-                        Paso 2
+                    <Typography variant="h3" align="center" sx={{ fontWeight: 700, color: '#333', fontSize: '2.5rem' }}>
+                        Construye
                     </Typography>
-                    <Typography variant="body2" align="center" sx={{ color: '#666', maxWidth: '120px' }}>
-                        Ingresa tu prompt en nuestra IA
+                    <Typography variant="h6" align="center" sx={{ color: '#666', maxWidth: '220px', fontWeight: 400, lineHeight: 1.4 }}>
+                        Habla con nuestra IA para generar las reglas de negocio
                     </Typography>
                 </Stack>
-                <Stack direction="column" alignItems="center" spacing={2}>
-                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 120, height: 120, boxShadow: 2 }}>
-                        <CheckBoxIcon sx={{ color: '#333', width: 60, height: 60 }} />
+                <Stack direction="column" alignItems="center" spacing={3}>
+                    <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
+                        <CheckBoxIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>
-                    <Typography variant="h6" align="center" sx={{ fontWeight: 700, color: '#333' }}>
-                        Paso 3
+                    <Typography variant="h3" align="center" sx={{ fontWeight: 700, color: '#333', fontSize: '2.5rem' }}>
+                        Regla Finalizada
                     </Typography>
-                    <Typography variant="body2" align="center" sx={{ color: '#666', maxWidth: '120px' }}>
-                        Revisa tu regla de negocio
+                    <Typography variant="h6" align="center" sx={{ color: '#666', maxWidth: '220px', fontWeight: 400, lineHeight: 1.4 }}>
+                        Revisa tus reglas de negocio
                     </Typography>
                 </Stack>
             </Stack>
