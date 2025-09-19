@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
+import { useNotification } from '../hooks/useNotification';
 import { 
   Box, 
   Typography, 
@@ -48,6 +49,10 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
+  Refresh as RefreshIcon,
+  Delete as DeleteIcon,
+  ExpandMore as ExpandMoreIcon,
+  CloudUpload as CloudUploadIcon,
   Close as CloseIcon,
   ExitToApp as ExitToAppIcon,
   Person as PersonIcon,
@@ -55,10 +60,6 @@ import {
   Business as BusinessIcon,
   Schedule as ScheduleIcon,
   Badge as BadgeIcon,
-  CloudUpload as CloudUploadIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
 import { useBusinessRules } from '../hooks/useBusinessRules';
@@ -76,15 +77,42 @@ const Dashboard = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   
-  // UI states
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  // UI states - removed snackbar as we're using useNotification hook
+  
+  // Dynamic notifications state
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      type: 'success',
+      title: 'Regla Creada',
+      message: 'Se creó una nueva regla exitosamente',
+      timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
+      read: false
+    },
+    {
+      id: 2,
+      type: 'info',
+      title: 'IA Conectada',
+      message: 'Gemini AI está listo para generar reglas',
+      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      read: false
+    }
+  ]);
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { goToLogin } = useNavigation();
+  const { showSuccess, showError, showWarning, showInfo } = useNotification();
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
   const fileInputRef = useRef(null);
+  const welcomeShownRef = useRef(false);
+  const lastErrorRef = useRef(null);
+  const chatScrollRef = useRef(null);
+  
+  // Conversation mode state
+  const [conversationMode, setConversationMode] = useState(false);
+  const [conversationMessage, setConversationMessage] = useState('');
   
   // Business rules hook
   const {
@@ -111,15 +139,38 @@ const Dashboard = () => {
     if (!authService.isAuthenticated()) {
       // User is not authenticated, redirect to login
       goToLogin();
+    } else if (!welcomeShownRef.current) {
+      // User is authenticated, show welcome message only once
+      welcomeShownRef.current = true;
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        showSuccess(`¡Bienvenido, ${currentUser.usuario}!`, 4000);
+        
+        // Add welcome notification to bell system
+        addNotification('info', 'Bienvenido', `¡Hola ${currentUser.usuario}! Listo para generar reglas de negocio.`);
+      }
     }
   }, [goToLogin]);
 
-  // Show error in snackbar
+  // Auto-refresh notification timestamps every minute
   useEffect(() => {
-    if (error) {
-      setSnackbar({ open: true, message: error, severity: 'error' });
+    const interval = setInterval(() => {
+      setNotifications(prev => [...prev]); // Force re-render to update timestamps
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Show error using notification hook
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) {
+      lastErrorRef.current = error;
+      showError(error);
+      
+      // Also add to the notification bell system
+      addNotification('error', 'Error del Sistema', error);
     }
-  }, [error]);
+  }, [error, showError]);
 
   const handleDrawerToggle = () => {
     if (isMobile) {
@@ -146,7 +197,7 @@ const Dashboard = () => {
 
   const handlePromptSubmit = async () => {
     if (!promptText.trim() && !selectedFile) {
-      setSnackbar({ open: true, message: 'Escribe un prompt o sube un archivo para generar una regla', severity: 'warning' });
+      showWarning('Escribe un prompt o sube un archivo para generar una regla');
       return;
     }
 
@@ -157,11 +208,27 @@ const Dashboard = () => {
         descripcion: promptText.trim() || 'Regla generada desde archivo'
       });
 
-      setSnackbar({ open: true, message: '¡Regla de negocio generada exitosamente!', severity: 'success' });
+      // Add notification for successful rule generation
+      addNotification(
+        'success',
+        'Regla Creada',
+        `Nueva regla de negocio generada: ${promptText.trim() || 'desde archivo'}`
+      );
+
+      showSuccess('¡Regla de negocio generada exitosamente!');
       setPromptText('');
       setSelectedFile(null);
     } catch (err) {
       console.error('Error generating rule:', err);
+      
+      // Add notification for error
+      addNotification(
+        'error',
+        'Error en Generación',
+        'No se pudo generar la regla de negocio. Intenta nuevamente.'
+      );
+      
+      showError('Error al generar la regla. Intenta nuevamente.');
     }
   };
 
@@ -181,6 +248,13 @@ const Dashboard = () => {
     setLogoutDialogOpen(false);
     // Clear user session
     authService.logout();
+    
+    // Add logout notification to bell system
+    addNotification('info', 'Sesión Cerrada', 'Has cerrado sesión exitosamente');
+    
+    // Show immediate feedback
+    showInfo('Sesión cerrada exitosamente');
+    
     // Redirect to login
     goToLogin();
   };
@@ -217,17 +291,17 @@ const Dashboard = () => {
     const fileExtension = file.name.toLowerCase();
     
     if (!allowedTypes.includes(file.type) && !fileExtension.endsWith('.csv')) {
-      setSnackbar({ open: true, message: 'Solo se permiten archivos CSV', severity: 'error' });
+      showError('Solo se permiten archivos CSV');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setSnackbar({ open: true, message: 'El archivo debe ser menor a 10MB', severity: 'error' });
+      showError('El archivo debe ser menor a 10MB');
       return;
     }
 
     setSelectedFile(file);
-    setSnackbar({ open: true, message: `Archivo "${file.name}" seleccionado`, severity: 'success' });
+    showSuccess(`Archivo "${file.name}" seleccionado`);
   };
 
   const handleFileRemove = () => {
@@ -242,11 +316,6 @@ const Dashboard = () => {
   const handleDragLeave = (event) => {
     event.preventDefault();
     setDragOver(false);
-  };
-
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === 'clickaway') return;
-    setSnackbar({ ...snackbar, open: false });
   };
 
   // Get current user data from authentication service
@@ -270,26 +339,53 @@ const Dashboard = () => {
     role: 'Invitado'
   };
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'success',
-      title: 'Regla Creada',
-      message: 'Se creó una nueva regla exitosamente',
-      time: '2 min ago',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'info',
-      title: 'IA Conectada',
-      message: 'Gemini AI está listo para generar reglas',
-      time: '15 min ago',
-      read: false
-    }
-  ];
+
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Time formatting function
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - timestamp) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'Hace unos segundos';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `Hace ${minutes} min`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `Hace ${hours} hr${hours > 1 ? 's' : ''}`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `Hace ${days} día${days > 1 ? 's' : ''}`;
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = (notificationId) => {
+    setNotifications(prev => 
+      prev.map(notif => 
+        notif.id === notificationId 
+          ? { ...notif, read: true }
+          : notif
+      )
+    );
+  };
+
+  // Add new notification (for rule generation)
+  const addNotification = (type, title, message) => {
+    const newNotification = {
+      id: Date.now(), // Simple ID generation
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false
+    };
+    
+    setNotifications(prev => [newNotification, ...prev]);
+  };
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -1071,7 +1167,9 @@ const Dashboard = () => {
                           '&:hover': {
                             backgroundColor: '#f5f5f5'
                           }
-                        }}>
+                        }}
+                        onClick={() => markNotificationAsRead(notification.id)}
+                        >
                           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
                             {getNotificationIcon(notification.type)}
                             <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1116,7 +1214,7 @@ const Dashboard = () => {
                                   color: '#999'
                                 }}
                               >
-                                {notification.time}
+                                {formatTimeAgo(notification.timestamp)}
                               </Typography>
                             </Box>
                           </Box>
@@ -1158,16 +1256,7 @@ const Dashboard = () => {
       </Popper>
 
       {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+
 
       {/* Logout Dialog */}
       <Dialog open={logoutDialogOpen} onClose={handleLogoutCancel}>
