@@ -4,7 +4,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useFormValidation } from '../hooks/useFormValidation';
 import { useNavigation } from '../hooks/useNavigation';
 import { useNotification } from '../hooks/useNotification';
-import { formHelpers, constants, utilityHelpers } from '../helpers';
+import { constants, utilityHelpers } from '../helpers';
+import authService from '../services/authService';
 
 const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,8 +42,8 @@ const Register = () => {
       // Clean form data before submission
       const cleanedData = utilityHelpers.cleanFormData(formData);
       
-      // Submit to backend (simulated)
-      const result = await formHelpers.submitRegistration(cleanedData);
+      // Submit to real backend API
+      const result = await authService.register(cleanedData);
       
       if (result.success) {
         showSuccess(result.message);

@@ -10,6 +10,14 @@ class AuthService {
   // Register new user
   async register(userData) {
     try {
+      console.log('📝 Frontend register attempt:', { 
+        correo: userData.email, 
+        usuario: userData.username, 
+        contrasenia: '***',
+        pais_region: userData.country 
+      });
+      console.log('🌐 API URL:', `${this.baseURL}/auth/register`);
+      
       const response = await fetch(`${this.baseURL}/auth/register`, {
         method: 'POST',
         headers: {
@@ -23,7 +31,11 @@ class AuthService {
         }),
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+      
       const data = await response.json();
+      console.log('📦 Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error en el registro');
@@ -35,6 +47,7 @@ class AuthService {
         user: data.user
       };
     } catch (error) {
+      console.error('❌ Register error:', error);
       return {
         success: false,
         message: error.message || 'Error de conexión'
@@ -45,6 +58,9 @@ class AuthService {
   // Login user
   async login(credentials) {
     try {
+      console.log('🔐 Frontend login attempt:', { usuario: credentials.usuario, contrasenia: '***' });
+      console.log('🌐 API URL:', `${this.baseURL}/auth/login`);
+      
       const response = await fetch(`${this.baseURL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -56,7 +72,11 @@ class AuthService {
         }),
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+      
       const data = await response.json();
+      console.log('📦 Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error en el login');
@@ -74,6 +94,7 @@ class AuthService {
         user: data.user
       };
     } catch (error) {
+      console.error('❌ Login error:', error);
       return {
         success: false,
         message: error.message || 'Error de conexión'

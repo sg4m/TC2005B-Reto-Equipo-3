@@ -262,7 +262,6 @@ const Dashboard = () => {
       minute: '2-digit'
     }) : 'No disponible',
     userId: currentUser.id_usuario || 'N/A',
-    role: 'Analista de Reglas de Negocio'
   } : {
     name: 'Usuario Invitado',
     email: 'guest@banorte.com',
@@ -657,7 +656,7 @@ const Dashboard = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" sx={{ color: '#999', mb: 2 }}>
-                      🤖 Bienvenido al Generador IA
+                      Bienvenido al Generador IA
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#bbb' }}>
                       Escribe un prompt o sube un archivo CSV para generar reglas de negocio
@@ -709,7 +708,7 @@ const Dashboard = () => {
                 >
                   <CloudUploadIcon sx={{ fontSize: '32px', color: dragOver ? '#EB0029' : '#999', mb: 1 }} />
                   <Typography sx={{ fontSize: '14px', color: '#666' }}>
-                    📁 Arrastra un archivo CSV o haz clic para seleccionar
+                    Arrastra un archivo CSV o haz clic para seleccionar
                   </Typography>
                 </Box>
               )}
@@ -727,7 +726,7 @@ const Dashboard = () => {
                   fullWidth
                   multiline
                   maxRows={3}
-                  placeholder="💡 Describe el tipo de regla de negocio que necesitas..."
+                  placeholder="Describe el tipo de regla de negocio que necesitas..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
                   disabled={isGenerating}
@@ -784,7 +783,7 @@ const Dashboard = () => {
                 fontSize: '18px'
               }}
             >
-              📊 Últimos Movimientos
+              Últimos Movimientos
             </Typography>
             
             <Box sx={{ 
@@ -837,7 +836,7 @@ const Dashboard = () => {
                 ) : (
                   <Box sx={{ py: 4, textAlign: 'center' }}>
                     <Typography variant="body2" sx={{ color: '#999' }}>
-                      🔄 No hay movimientos recientes
+                    No hay movimientos recientes
                     </Typography>
                   </Box>
                 )}
@@ -1179,8 +1178,29 @@ const Dashboard = () => {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleLogoutCancel}>No</Button>
-          <Button onClick={handleLogoutConfirm} variant="contained">Sí</Button>
+          <Button 
+            onClick={handleLogoutCancel}
+            sx={{ 
+              color: '#EB0029',
+              '&:hover': { 
+                backgroundColor: 'rgba(235, 0, 41, 0.04)' 
+              }
+            }}
+          >
+            No
+          </Button>
+          <Button 
+            onClick={handleLogoutConfirm} 
+            variant="contained"
+            sx={{ 
+              bgcolor: '#EB0029',
+              '&:hover': { 
+                bgcolor: '#D32F2F' 
+              }
+            }}
+          >
+            Sí
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
