@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import authService from '../services/authService';
 import { 
   Box, 
   Typography, 
@@ -105,6 +106,14 @@ const Dashboard = () => {
     loadMovements();
   }, [loadMovements]);
 
+  // Check authentication status on component mount
+  useEffect(() => {
+    if (!authService.isAuthenticated()) {
+      // User is not authenticated, redirect to login
+      goToLogin();
+    }
+  }, [goToLogin]);
+
   // Show error in snackbar
   useEffect(() => {
     if (error) {
@@ -170,6 +179,9 @@ const Dashboard = () => {
 
   const handleLogoutConfirm = () => {
     setLogoutDialogOpen(false);
+    // Clear user session
+    authService.logout();
+    // Redirect to login
     goToLogin();
   };
 
@@ -237,13 +249,26 @@ const Dashboard = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Sample user and notification data (simplified for demo)
-  const userData = {
-    name: 'Santiago Gamborino',
-    email: 'santiago.gamborino@banorte.com',
-    lastLogin: '16 Sep 2025, 09:30 AM',
-    userId: 'USR001234',
+  // Get current user data from authentication service
+  const currentUser = authService.getCurrentUser();
+  const userData = currentUser ? {
+    name: currentUser.usuario || 'Usuario',
+    email: currentUser.correo || 'email@banorte.com',
+    lastLogin: currentUser.fecha_registro ? new Date(currentUser.fecha_registro).toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : 'No disponible',
+    userId: currentUser.id_usuario || 'N/A',
     role: 'Analista de Reglas de Negocio'
+  } : {
+    name: 'Usuario Invitado',
+    email: 'guest@banorte.com',
+    lastLogin: 'No disponible',
+    userId: 'GUEST',
+    role: 'Invitado'
   };
 
   const notifications = [

@@ -16,6 +16,7 @@ import { IconButton, InputAdornment } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
+import authService from '../services/authService';
 
 import './Login.css'
 
@@ -43,15 +44,23 @@ const Login = () => {
         setLoading(true);
         
         try {
-            // Here you would normally make an API call to authenticate
-            // For now, we'll simulate a successful login
-            setTimeout(() => {
-                setLoading(false);
+            // Call real authentication API
+            const result = await authService.login({
+                usuario: email, // Can be username or email
+                contrasenia: password
+            });
+
+            if (result.success) {
+                // User is now logged in and data is stored in localStorage
                 goToDashboard();
-            }, 1000);
+            } else {
+                alert(result.message || 'Error al iniciar sesión');
+            }
         } catch (error) {
+            alert('Error de conexión. Intenta nuevamente.');
+            console.error('Login error:', error);
+        } finally {
             setLoading(false);
-            alert('Error al iniciar sesión. Intenta nuevamente.');
         }
     };
     return (
@@ -60,17 +69,17 @@ const Login = () => {
             <Box className="fondo-login"
                 sx={{
                     position: 'fixed',
-                    top: 32,
+                    top: 30,
                     left: 0,
                     backgroundImage: "url('/src/assets/FondoLogin.svg')",
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     height: '55vh',
                     width: '100vw',
-                    zIndex: 0
+                    zIndex: 1
                 }}
             />
-            <AppBar position="fixed" sx={{ bgcolor: '#EB0029', boxShadow: 0, backgroundImage: "url('/src/assets/HeaderBanorte.svg')", backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 1300, cursor: 'pointer' }} onClick={() => setActiveSection('Login')}>
+            <AppBar position="fixed" sx={{ bgcolor: '#EB0029', boxShadow: 0, backgroundImage: "url('/src/assets/HeaderBanorte.svg')", backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 1001, cursor: 'pointer' }} onClick={() => setActiveSection('Login')}>
                 <Toolbar>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <img 
@@ -254,7 +263,7 @@ const Login = () => {
                 paddingY: 6,
                 paddingX: 8
             }}>
-                <Stack direction="column" alignItems="center" spacing={3}>
+                <Stack direction="column" alignItems="center" spacing={2}>
                     <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
                         <AccountBoxIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>
@@ -265,7 +274,7 @@ const Login = () => {
                         Crea tu cuenta o inicia sesión
                     </Typography>
                 </Stack>
-                <Stack direction="column" alignItems="center" spacing={3}>
+                <Stack direction="column" alignItems="center" spacing={2}>
                     <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
                         <DrawIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>
@@ -276,7 +285,7 @@ const Login = () => {
                         Habla con nuestra IA para generar las reglas de negocio
                     </Typography>
                 </Stack>
-                <Stack direction="column" alignItems="center" spacing={3}>
+                <Stack direction="column" alignItems="center" spacing={2}>
                     <Avatar sx={{ bgcolor: '#E5E5E5', width: 180, height: 180, boxShadow: 3 }}>
                         <CheckBoxIcon sx={{ color: '#333', width: 90, height: 90 }} />
                     </Avatar>

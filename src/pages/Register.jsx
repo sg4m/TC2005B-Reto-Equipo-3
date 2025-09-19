@@ -87,7 +87,7 @@ const Register = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '64px',
+        height: '55px',
         width: '100%',
         position: 'relative',
         top: 0,
@@ -101,7 +101,7 @@ const Register = () => {
           <Box sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '4px'
           }}>
             {/* Logo Image */}
             <img 
@@ -109,7 +109,7 @@ const Register = () => {
               alt="Banorte"
               onClick={goToLogin}
               style={{
-                height: '40px',
+                height: '25px',
                 width: 'auto',
                 filter: 'brightness(0) invert(1)',
                 cursor: 'pointer'
