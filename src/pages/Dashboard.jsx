@@ -114,7 +114,7 @@ const Dashboard = () => {
   const [conversationMode, setConversationMode] = useState(false);
   const [conversationMessage, setConversationMessage] = useState('');
   
-  // Business rules hook
+  // Business rules hook (using current user's ID)
   const {
     isLoading,
     isGenerating,
@@ -125,7 +125,7 @@ const Dashboard = () => {
     generateRule,
     loadMovements,
     clearState
-  } = useBusinessRules(1);
+  } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
 
   const drawerWidth = 240;
 
