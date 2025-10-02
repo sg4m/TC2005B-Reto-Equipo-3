@@ -60,9 +60,13 @@ import {
   Email as EmailIcon,
   Schedule as ScheduleIcon,
   Badge as BadgeIcon,
+  ChatBubbleOutline as ChatIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
 import { useBusinessRules } from '../hooks/useBusinessRules';
+import { useConversation } from '../hooks/useConversation';
+import { aiService } from '../services/api';
 
 const Dashboard = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -116,6 +120,7 @@ const Dashboard = () => {
   const welcomeShownRef = useRef(false);
   const lastErrorRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const conversationScrollRef = useRef(null);
   
   // Conversation mode state
   const [conversationMode, setConversationMode] = useState(false);
@@ -133,6 +138,21 @@ const Dashboard = () => {
     loadMovements,
     clearState
   } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
+
+  // Conversation hook
+  const {
+    isConversationActive,
+    isProcessing,
+    conversationHistory,
+    currentResponse,
+    error: conversationError,
+    isReadyToGenerate,
+    startConversation,
+    continueConversation,
+    endConversation,
+    resetConversation,
+    getConversationSummary
+  } = useConversation();
 
   const drawerWidth = 240;
 
@@ -193,6 +213,24 @@ const Dashboard = () => {
     }
   }, [error, showError]);
 
+  // Handle conversation errors
+  useEffect(() => {
+    if (conversationError) {
+      showError(conversationError);
+      addNotification('error', 'Error en Conversación', conversationError);
+    }
+  }, [conversationError, showError]);
+
+  // Auto-scroll conversation to bottom when new messages are added
+  useEffect(() => {
+    if (conversationScrollRef.current && conversationHistory.length > 0) {
+      const scrollElement = conversationScrollRef.current;
+      setTimeout(() => {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }, 100);
+    }
+  }, [conversationHistory]);
+
   const handleDrawerToggle = () => {
     if (isMobile) {
       setMobileOpen(!mobileOpen);
@@ -216,10 +254,106 @@ const Dashboard = () => {
     }
   };
 
+  // Handle conversation mode toggle
+  const handleToggleConversationMode = () => {
+    if (conversationMode) {
+      // Exiting conversation mode - reset everything
+      resetConversation();
+      setConversationMessage('');
+    }
+    setConversationMode(!conversationMode);
+  };
+
+  // Handle starting conversation
+  const handleStartConversation = async () => {
+    if (!promptText.trim()) {
+      showWarning('Escribe una descripción inicial de la regla que necesitas');
+      return;
+    }
+
+    try {
+      await startConversation(promptText.trim());
+      showSuccess('¡Conversación iniciada con Gemini!');
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+      showError('Error al iniciar conversación. Intenta nuevamente.');
+    }
+  };
+
+  // Handle continuing conversation
+  const handleContinueConversation = async () => {
+    if (!conversationMessage.trim()) {
+      showWarning('Escribe una respuesta para continuar la conversación');
+      return;
+    }
+
+    try {
+      await continueConversation(conversationMessage.trim());
+      setConversationMessage('');
+    } catch (err) {
+      console.error('Error continuing conversation:', err);
+      showError('Error en la conversación. Intenta nuevamente.');
+    }
+  };
+
+  // Handle generating rule from conversation
+  const handleGenerateFromConversation = async () => {
+    if (!isReadyToGenerate) {
+      showWarning('La conversación aún no está lista para generar la regla');
+      return;
+    }
+
+    try {
+      // Create a summary prompt from the conversation
+      const summary = getConversationSummary();
+      const finalPrompt = `${summary?.summary || ''}\n\nDetalles adicionales de la conversación:\n${conversationHistory
+        .filter(msg => msg.role === 'user')
+        .map(msg => msg.content)
+        .join('\n')}`;
+
+      await generateRule({
+        prompt_texto: finalPrompt,
+        archivo: selectedFile,
+        descripcion: summary?.summary || 'Regla generada desde conversación con IA'
+      });
+
+      // Add notification for successful rule generation
+      addNotification(
+        'success',
+        'Regla Creada',
+        'Nueva regla de negocio generada desde conversación con IA'
+      );
+
+      showSuccess('¡Regla de negocio generada exitosamente!');
+      
+      // Reset conversation and form
+      resetConversation();
+      setConversationMode(false);
+      setPromptText('');
+      setSelectedFile(null);
+      
+    } catch (err) {
+      console.error('Error generating rule from conversation:', err);
+      
+      addNotification(
+        'error',
+        'Error en Generación',
+        'No se pudo generar la regla de negocio. Intenta nuevamente.'
+      );
+      
+      showError('Error al generar la regla. Intenta nuevamente.');
+    }
+  };
+
   const handlePromptSubmit = async () => {
     if (!promptText.trim() && !selectedFile) {
       showWarning('Escribe un prompt o sube un archivo para generar una regla');
       return;
+    }
+
+    // If in conversation mode, start conversation instead of direct generation
+    if (conversationMode) {
+      return handleStartConversation();
     }
 
     try {
@@ -483,7 +617,40 @@ const Dashboard = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: 'white' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      minHeight: '100vh', 
+      width: '100vw',
+      backgroundColor: '#f8f9fa',
+      overflow: 'hidden'
+    }}>
+      {/* CSS Animations and Override Global Styles */}
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 80%, 100% {
+              opacity: 0.3;
+              transform: scale(0.8);
+            }
+            40% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          
+          /* Override global dark theme styles */
+          html, body, #root {
+            background-color: #f8f9fa !important;
+            color: #333 !important;
+            overflow-x: hidden;
+          }
+          
+          body {
+            display: block !important;
+            place-items: unset !important;
+          }
+        `}
+      </style>
       {/* Header */}
       <Box sx={{ 
         backgroundImage: 'url(/src/assets/HeaderBanorte.svg)',
@@ -495,7 +662,7 @@ const Dashboard = () => {
         alignItems: 'center',
         justifyContent: 'space-between',
         height: '64px',
-        width: '100%',
+        width: '100vw',
         position: 'fixed',
         top: 0,
         left: 0,
@@ -582,7 +749,7 @@ const Dashboard = () => {
       {/* Separator line */}
       <Box sx={{ 
         height: '2px',
-        width: '100%',
+        width: '100vw',
         background: 'linear-gradient(90deg, #E0E0E0 0%, #BDBDBD 50%, #E0E0E0 100%)',
         opacity: 0.6,
         position: 'fixed',
@@ -685,24 +852,28 @@ const Dashboard = () => {
       <Box
         component="main"
         sx={{
-          position: 'absolute',
+          position: 'fixed',
           top: '80px',
-          left: desktopSidebarOpen ? `${drawerWidth + 100}px` : '8px',
-          right: '5px',
-          bottom: '20px',
+          left: desktopSidebarOpen ? `${drawerWidth}px` : '0px',
+          right: '0px',
+          bottom: '0px',
           transition: theme.transitions.create(['left'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
-          backgroundColor: 'white'
+          backgroundColor: '#f8f9fa',
+          padding: 2,
+          overflow: 'auto'
         }}
       >
         <Box sx={{ 
           display: 'grid', 
           gridTemplateColumns: { xs: '1fr', lg: '2.2fr 0.8fr' },
-          gap: 1,
-          height: '100%',
-          width: '95%'
+          gap: 2,
+          height: 'calc(100vh - 100px)',
+          width: '100%',
+          maxWidth: '1400px',
+          margin: '0 auto'
         }}>
           
           {/* Left column - AI Business Rule Generator */}
@@ -740,7 +911,271 @@ const Dashboard = () => {
               minHeight: '400px',
               overflow: 'hidden'
             }}>
-              {isGenerating ? (
+              {/* Conversation Mode */}
+              {isConversationActive ? (
+                <Box sx={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  backgroundColor: 'white',
+                  height: '100%'
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                    <Typography variant="h6" sx={{ color: '#333', fontWeight: 600 }}>
+                      💬 Conversación con Gemini
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        resetConversation();
+                        setConversationMode(false);
+                      }}
+                      startIcon={<CloseIcon />}
+                      sx={{ color: '#666' }}
+                    >
+                      Terminar Conversación
+                    </Button>
+                  </Box>
+
+                  {/* Conversation History */}
+                  <Box 
+                    ref={conversationScrollRef}
+                    sx={{ 
+                      flex: 1, 
+                      overflow: 'auto', 
+                      mb: 3,
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      p: 2,
+                      backgroundColor: '#f5f5f5',
+                      maxHeight: '400px',
+                      '&::-webkit-scrollbar': {
+                        width: '8px',
+                      },
+                      '&::-webkit-scrollbar-track': {
+                        backgroundColor: '#f1f1f1',
+                        borderRadius: '4px',
+                      },
+                      '&::-webkit-scrollbar-thumb': {
+                        backgroundColor: '#c1c1c1',
+                        borderRadius: '4px',
+                        '&:hover': {
+                          backgroundColor: '#a8a8a8',
+                        },
+                      },
+                    }}>
+                    
+                    {/* Welcome message when conversation starts but no history yet */}
+                    {conversationHistory.length === 0 && (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        height: '100%',
+                        minHeight: '200px'
+                      }}>
+                        <Box sx={{
+                          textAlign: 'center',
+                          p: 3,
+                          backgroundColor: 'white',
+                          borderRadius: '12px',
+                          border: '1px solid #e0e0e0',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+                        }}>
+                          <Typography variant="h6" sx={{ color: '#333', mb: 1 }}>
+                            💬 Conversación Iniciada
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#666' }}>
+                            Gemini te hará preguntas específicas para crear la regla perfecta
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+
+                    {conversationHistory.map((message, index) => (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          mb: 2, 
+                          display: 'flex',
+                          justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                          width: '100%'
+                        }}
+                      >
+                        <Box sx={{
+                          maxWidth: '80%',
+                          p: 2,
+                          borderRadius: '12px',
+                          backgroundColor: message.role === 'user' ? '#EB0029' : 'white',
+                          color: message.role === 'user' ? 'white' : '#333',
+                          boxShadow: message.role === 'user' ? 
+                            '0 2px 8px rgba(235, 0, 41, 0.2)' : 
+                            '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          border: message.role === 'assistant' ? '1px solid #e0e0e0' : 'none'
+                        }}>
+                          <Typography variant="body2" sx={{ mb: 1 }}>
+                            {message.content}
+                          </Typography>
+                          
+                          {/* Show AI questions if available */}
+                          {message.role === 'assistant' && message.data?.questions && message.data.questions.length > 0 && (
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, opacity: 0.8 }}>
+                                Preguntas específicas:
+                              </Typography>
+                              {message.data.questions.map((question, qIndex) => (
+                                <Typography key={qIndex} variant="body2" sx={{ mb: 0.5, opacity: 0.9 }}>
+                                  • {question}
+                                </Typography>
+                              ))}
+                            </Box>
+                          )}
+                          
+                          {/* Show confidence level */}
+                          {message.role === 'assistant' && message.data?.confidence_level && (
+                            <Chip
+                              label={`Confianza: ${message.data.confidence_level}`}
+                              size="small"
+                              sx={{ 
+                                mt: 1,
+                                backgroundColor: message.data.confidence_level === 'alta' ? '#4CAF50' : 
+                                                message.data.confidence_level === 'media' ? '#FF9800' : '#f44336',
+                                color: 'white',
+                                fontSize: '10px'
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    ))}
+                    
+                    {isProcessing && (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'flex-start',
+                        mb: 2 
+                      }}>
+                        <Box sx={{
+                          maxWidth: '80%',
+                          p: 2,
+                          borderRadius: '12px',
+                          backgroundColor: 'white',
+                          border: '1px solid #e0e0e0',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              gap: 0.5,
+                              alignItems: 'center'
+                            }}>
+                              <Box sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: '#EB0029',
+                                animation: 'pulse 1.5s ease-in-out infinite'
+                              }} />
+                              <Box sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: '#EB0029',
+                                animation: 'pulse 1.5s ease-in-out infinite 0.2s'
+                              }} />
+                              <Box sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: '#EB0029',
+                                animation: 'pulse 1.5s ease-in-out infinite 0.4s'
+                              }} />
+                            </Box>
+                            <Typography variant="body2" sx={{ color: '#666' }}>
+                              Gemini está analizando tu respuesta...
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Conversation Input */}
+                  {!isReadyToGenerate ? (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        maxRows={2}
+                        placeholder="Responde a las preguntas de Gemini..."
+                        value={conversationMessage}
+                        onChange={(e) => setConversationMessage(e.target.value)}
+                        disabled={isProcessing}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleContinueConversation();
+                          }
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'white',
+                            '& fieldset': { borderColor: '#e0e0e0' },
+                            '&:hover fieldset': { borderColor: '#EB0029' },
+                            '&.Mui-focused fieldset': { borderColor: '#EB0029' },
+                          }
+                        }}
+                      />
+                      <Button
+                        onClick={handleContinueConversation}
+                        disabled={isProcessing || !conversationMessage.trim()}
+                        variant="contained"
+                        sx={{ 
+                          bgcolor: '#EB0029',
+                          '&:hover': { bgcolor: '#D32F2F' },
+                          minWidth: '100px'
+                        }}
+                      >
+                        Responder
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box sx={{ 
+                      p: 3, 
+                      backgroundColor: '#e8f5e8', 
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <Typography variant="h6" sx={{ color: '#2e7d32', mb: 2 }}>
+                        ✅ ¡Listo para generar la regla!
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#388e3c', mb: 3 }}>
+                        Gemini ha recopilado suficiente información. ¿Quieres generar la regla ahora?
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                        <Button
+                          onClick={handleGenerateFromConversation}
+                          variant="contained"
+                          disabled={isGenerating}
+                          sx={{ 
+                            bgcolor: '#2e7d32',
+                            '&:hover': { bgcolor: '#1b5e20' }
+                          }}
+                        >
+                          {isGenerating ? 'Generando...' : 'Generar Regla'}
+                        </Button>
+                        <Button
+                          onClick={() => setConversationMessage('')}
+                          disabled={isGenerating}
+                          sx={{ color: '#666' }}
+                        >
+                          Continuar Conversación
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ) : isGenerating ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                   <LinearProgress sx={{ width: '100%', mb: 2 }} />
                   <Typography sx={{ color: '#666', textAlign: 'center' }}>
@@ -843,13 +1278,62 @@ const Dashboard = () => {
               )}
             </Box>
 
+            {/* Mode Toggle */}
+            <Box sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mb: 3,
+              gap: 2
+            }}>
+              <Button
+                variant={!conversationMode ? "contained" : "outlined"}
+                onClick={() => !conversationMode || handleToggleConversationMode()}
+                disabled={isConversationActive}
+                startIcon={<AutoAwesomeIcon />}
+                sx={{ 
+                  bgcolor: !conversationMode ? '#EB0029' : 'transparent',
+                  borderColor: '#EB0029',
+                  color: !conversationMode ? 'white' : '#EB0029',
+                  '&:hover': { 
+                    bgcolor: !conversationMode ? '#D32F2F' : 'rgba(235, 0, 41, 0.04)',
+                    borderColor: '#EB0029'
+                  }
+                }}
+              >
+                Generación Directa
+              </Button>
+              
+              <Typography sx={{ color: '#666', fontSize: '14px' }}>
+                o
+              </Typography>
+              
+              <Button
+                variant={conversationMode ? "contained" : "outlined"}
+                onClick={handleToggleConversationMode}
+                disabled={isGenerating}
+                startIcon={<ChatIcon />}
+                sx={{ 
+                  bgcolor: conversationMode ? '#EB0029' : 'transparent',
+                  borderColor: '#EB0029',
+                  color: conversationMode ? 'white' : '#EB0029',
+                  '&:hover': { 
+                    bgcolor: conversationMode ? '#D32F2F' : 'rgba(235, 0, 41, 0.04)',
+                    borderColor: '#EB0029'
+                  }
+                }}
+              >
+                Conversación con IA
+              </Button>
+            </Box>
+
             {/* Input and File Upload Area */}
             <Box sx={{ 
-              backgroundColor: '#E8E8E8',
+              backgroundColor: '#D3D3D3',
               borderRadius: '12px',
               p: 3
             }}>
-              {selectedFile ? (
+              {!conversationMode && selectedFile ? (
                 <Box sx={{ 
                   display: 'flex', 
                   alignItems: 'center', 
@@ -903,10 +1387,14 @@ const Dashboard = () => {
                   fullWidth
                   multiline
                   maxRows={3}
-                  placeholder="Describe el tipo de regla de negocio que necesitas..."
+                  placeholder={
+                    conversationMode 
+                      ? "Describe brevemente qué tipo de regla necesitas para iniciar la conversación..."
+                      : "Describe el tipo de regla de negocio que necesitas..."
+                  }
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  disabled={isGenerating}
+                  disabled={isGenerating || isConversationActive}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -923,19 +1411,21 @@ const Dashboard = () => {
                     }
                   }}
                 />
-                <IconButton 
+                <Button 
                   onClick={handlePromptSubmit}
-                  disabled={isGenerating || (!promptText.trim() && !selectedFile)}
+                  disabled={isGenerating || isConversationActive || (!promptText.trim() && !selectedFile)}
+                  variant="contained"
                   sx={{ 
-                    backgroundColor: (!isGenerating && (promptText.trim() || selectedFile)) ? '#EB0029' : '#ccc',
+                    backgroundColor: (!isGenerating && !isConversationActive && (promptText.trim() || selectedFile)) ? '#EB0029' : '#ccc',
                     color: 'white',
+                    minWidth: '120px',
                     '&:hover': {
-                      backgroundColor: (!isGenerating && (promptText.trim() || selectedFile)) ? '#D32F2F' : '#ccc',
+                      backgroundColor: (!isGenerating && !isConversationActive && (promptText.trim() || selectedFile)) ? '#D32F2F' : '#ccc',
                     }
                   }}
                 >
-                  <SendIcon />
-                </IconButton>
+                  {conversationMode ? 'Iniciar Chat' : 'Generar'}
+                </Button>
               </Box>
             </Box>
           </Box>

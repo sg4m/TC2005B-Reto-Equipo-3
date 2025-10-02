@@ -7,7 +7,16 @@ class GeminiService {
         }
         
         this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        // Using Gemini 2.5 Flash - fast, stable and available
+        this.model = this.genAI.getGenerativeModel({ 
+            model: 'gemini-2.5-flash',
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+            }
+        });
+        
+        console.log('✅ Gemini service initialized with model: gemini-2.5-flash');
     }
 
     /**
@@ -18,29 +27,30 @@ class GeminiService {
     async generateBusinessRulesFromPrompt(prompt) {
         try {
             const systemPrompt = `
-You are a business rules expert for Banorte bank. Generate comprehensive, actionable business rules based on the user's requirements.
+Eres un experto en reglas de negocio para el banco Banorte. Genera reglas de negocio comprensivas y accionables basadas en los requerimientos del usuario.
 
-Please format your response as a JSON object with this structure:
+Por favor, formatea tu respuesta como un objeto JSON con esta estructura:
 {
     "rules": [
         {
             "id": "temp_rule_1",
-            "title": "Rule Title",
-            "description": "Detailed description of the rule",
-            "conditions": ["condition 1", "condition 2"],
-            "actions": ["action 1", "action 2"],
-            "priority": "high|medium|low",
-            "category": "fraud_detection|compliance|risk_management|customer_service|other"
+            "title": "Título de la Regla",
+            "description": "Descripción detallada de la regla",
+            "conditions": ["condición 1", "condición 2"],
+            "actions": ["acción 1", "acción 2"],
+            "priority": "alta|media|baja",
+            "category": "deteccion_fraude|cumplimiento|gestion_riesgo|servicio_cliente|otro"
         }
     ],
-    "summary": "Brief summary of all generated rules",
-    "implementation_notes": "Key considerations for implementation"
+    "summary": "Resumen breve de todas las reglas generadas",
+    "implementation_notes": "Consideraciones clave para la implementación"
 }
 
-User Request: ${prompt}
+Solicitud del Usuario: ${prompt}
 
-Generate practical business rules that Banorte can implement for banking operations, compliance, risk management, or customer service.
-Use temporary IDs like "temp_rule_1", "temp_rule_2", etc. - they will be updated with database IDs later.
+Genera reglas de negocio prácticas que Banorte pueda implementar para operaciones bancarias, cumplimiento normativo, gestión de riesgos o servicio al cliente.
+Usa IDs temporales como "temp_rule_1", "temp_rule_2", etc. - serán actualizados con IDs de base de datos después.
+IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títulos, descripciones y comentarios.
 `;
 
             const result = await this.model.generateContent(systemPrompt);
@@ -57,20 +67,20 @@ Use temporary IDs like "temp_rule_1", "temp_rule_2", etc. - they will be updated
             return {
                 rules: [{
                     id: "temp_rule_fallback",
-                    title: "Generated Rule",
+                    title: "Regla Generada",
                     description: text,
-                    conditions: ["User request processed"],
-                    actions: ["Review and implement"],
-                    priority: "medium",
-                    category: "other"
+                    conditions: ["Solicitud del usuario procesada"],
+                    actions: ["Revisar e implementar"],
+                    priority: "media",
+                    category: "otro"
                 }],
-                summary: "Business rule generated from user prompt",
-                implementation_notes: "Review the generated rule for accuracy and compliance"
+                summary: "Regla de negocio generada desde solicitud del usuario",
+                implementation_notes: "Revisar la regla generada para verificar precisión y cumplimiento"
             };
 
         } catch (error) {
-            console.error('Error generating business rules from prompt:', error);
-            throw new Error('Failed to generate business rules: ' + error.message);
+            console.error('Error generando reglas de negocio desde prompt:', error);
+            throw new Error('Error al generar reglas de negocio: ' + error.message);
         }
     }
 
@@ -88,44 +98,45 @@ Use temporary IDs like "temp_rule_1", "temp_rule_2", etc. - they will be updated
             const sample = csvData.slice(0, 3); // First 3 rows as sample
 
             const systemPrompt = `
-You are a business rules expert for Banorte bank. Analyze the provided CSV data and generate relevant business rules.
+Eres un experto en reglas de negocio para el banco Banorte. Analiza los datos CSV proporcionados y genera reglas de negocio relevantes.
 
-CSV Data Analysis:
-- Headers: ${headers.join(', ')}
-- Row count: ${rowCount}
-- Sample data: ${JSON.stringify(sample, null, 2)}
-- Context: ${context}
+Análisis de Datos CSV:
+- Encabezados: ${headers.join(', ')}
+- Número de filas: ${rowCount}
+- Datos de muestra: ${JSON.stringify(sample, null, 2)}
+- Contexto: ${context}
 
-Please generate business rules that could be applied to this data for banking operations. Consider:
-- Data validation rules
-- Risk assessment rules  
-- Compliance requirements
-- Fraud detection patterns
-- Customer segmentation rules
-- Transaction limits or thresholds
+Por favor genera reglas de negocio que puedan aplicarse a estos datos para operaciones bancarias. Considera:
+- Reglas de validación de datos
+- Reglas de evaluación de riesgo
+- Requerimientos de cumplimiento normativo
+- Patrones de detección de fraude
+- Reglas de segmentación de clientes
+- Límites o umbrales de transacciones
 
-Format your response as JSON:
+Formatea tu respuesta como JSON:
 {
     "data_analysis": {
-        "data_type": "detected data type (transactions, customers, etc.)",
-        "key_insights": ["insight 1", "insight 2"],
-        "data_quality": "assessment of data quality"
+        "data_type": "tipo de datos detectado (transacciones, clientes, etc.)",
+        "key_insights": ["conocimiento 1", "conocimiento 2"],
+        "data_quality": "evaluación de la calidad de los datos"
     },
     "rules": [
         {
-            "id": "rule_001",
-            "title": "Rule Title",
-            "description": "Detailed description",
-            "conditions": ["condition based on data"],
-            "actions": ["recommended action"],
-            "priority": "high|medium|low",
-            "category": "fraud_detection|compliance|risk_management|customer_service|data_validation",
-            "data_fields": ["relevant CSV columns"]
+            "id": "regla_001",
+            "title": "Título de la Regla",
+            "description": "Descripción detallada",
+            "conditions": ["condición basada en datos"],
+            "actions": ["acción recomendada"],
+            "priority": "alta|media|baja",
+            "category": "deteccion_fraude|cumplimiento|gestion_riesgo|servicio_cliente|validacion_datos",
+            "data_fields": ["columnas CSV relevantes"]
         }
     ],
-    "summary": "Summary of generated rules",
-    "implementation_notes": "Implementation considerations"
+    "summary": "Resumen de las reglas generadas",
+    "implementation_notes": "Consideraciones de implementación"
 }
+IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, análisis y descripciones.
 `;
 
             const result = await this.model.generateContent(systemPrompt);
@@ -141,27 +152,27 @@ Format your response as JSON:
             // Fallback response
             return {
                 data_analysis: {
-                    data_type: "Unknown",
-                    key_insights: ["Data uploaded successfully"],
-                    data_quality: "Needs review"
+                    data_type: "Desconocido",
+                    key_insights: ["Datos cargados exitosamente"],
+                    data_quality: "Requiere revisión"
                 },
                 rules: [{
-                    id: "rule_001",
-                    title: "Data Review Rule",
-                    description: "Review uploaded data for business rule generation",
-                    conditions: [`Data has ${rowCount} rows`, `Headers: ${headers.join(', ')}`],
-                    actions: ["Manual review required"],
-                    priority: "medium",
-                    category: "data_validation",
+                    id: "regla_001",
+                    title: "Regla de Revisión de Datos",
+                    description: "Revisar datos cargados para la generación de reglas de negocio",
+                    conditions: [`Los datos tienen ${rowCount} filas`, `Encabezados: ${headers.join(', ')}`],
+                    actions: ["Revisión manual requerida"],
+                    priority: "media",
+                    category: "validacion_datos",
                     data_fields: headers
                 }],
-                summary: "Initial data analysis completed",
-                implementation_notes: "Manual review recommended for accurate rule generation"
+                summary: "Análisis inicial de datos completado",
+                implementation_notes: "Se recomienda revisión manual para generación precisa de reglas"
             };
 
         } catch (error) {
-            console.error('Error generating business rules from data:', error);
-            throw new Error('Failed to analyze data and generate rules: ' + error.message);
+            console.error('Error generando reglas de negocio desde datos:', error);
+            throw new Error('Error al analizar datos y generar reglas: ' + error.message);
         }
     }
 
@@ -174,14 +185,15 @@ Format your response as JSON:
     async refineBusinessRules(existingRules, feedback) {
         try {
             const systemPrompt = `
-You are a business rules expert for Banorte bank. Refine the existing business rules based on user feedback.
+Eres un experto en reglas de negocio para el banco Banorte. Refina las reglas de negocio existentes basado en la retroalimentación del usuario.
 
-Current Rules: ${JSON.stringify(existingRules, null, 2)}
+Reglas Actuales: ${JSON.stringify(existingRules, null, 2)}
 
-User Feedback: ${feedback}
+Retroalimentación del Usuario: ${feedback}
 
-Please update the rules according to the feedback while maintaining banking compliance and best practices.
-Return the refined rules in the same JSON format as the original.
+Por favor actualiza las reglas de acuerdo con la retroalimentación manteniendo el cumplimiento bancario y las mejores prácticas.
+Devuelve las reglas refinadas en el mismo formato JSON que las originales.
+IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títulos y descripciones.
 `;
 
             const result = await this.model.generateContent(systemPrompt);
@@ -196,8 +208,107 @@ Return the refined rules in the same JSON format as the original.
             return existingRules; // Return original if parsing fails
 
         } catch (error) {
-            console.error('Error refining business rules:', error);
-            throw new Error('Failed to refine business rules: ' + error.message);
+            console.error('Error refinando reglas de negocio:', error);
+            throw new Error('Error al refinar reglas de negocio: ' + error.message);
+        }
+    }
+
+    /**
+     * Start or continue a conversation to refine business rule requirements
+     * @param {string} userMessage - User's message in the conversation
+     * @param {Array} conversationHistory - Previous messages in the conversation
+     * @returns {Promise<Object>} Conversation response
+     */
+    async continueConversation(userMessage, conversationHistory = []) {
+        try {
+            const systemPrompt = `
+Eres un experto consultor en reglas de negocio para el banco Banorte. Tu trabajo es hacer preguntas específicas y detalladas para entender completamente los requerimientos antes de generar las reglas finales.
+
+IMPORTANTE: NO generes reglas de negocio todavía. Tu objetivo es hacer preguntas para clarificar y refinar los requerimientos.
+
+Contexto de la conversación:
+${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+
+Nuevo mensaje del usuario: ${userMessage}
+
+Debes responder en formato JSON con esta estructura:
+{
+    "message": "Tu pregunta o comentario para el usuario",
+    "questions": ["pregunta específica 1", "pregunta específica 2"],
+    "is_ready_to_generate": false,
+    "confidence_level": "bajo|medio|alto",
+    "missing_information": ["aspecto 1 que necesita aclaración", "aspecto 2"],
+    "summary_so_far": "Resumen de lo que has entendido hasta ahora"
+}
+
+Si el usuario confirma que ya tiene toda la información necesaria o dice algo como "sí, genera la regla" o "procede", entonces cambia "is_ready_to_generate" a true.
+
+Haz preguntas específicas sobre:
+- Montos o umbrales específicos
+- Horarios o días de aplicación
+- Tipos de transacciones o clientes
+- Acciones específicas a tomar
+- Excepciones o casos especiales
+- Niveles de autorización requeridos
+- Canales afectados (app, sucursal, web)
+
+RESPONDE ÚNICAMENTE en español y mantén un tono profesional pero amigable.
+`;
+
+            const result = await this.model.generateContent(systemPrompt);
+            const response = await result.response;
+            const text = response.text();
+
+            // Try to parse JSON from the response
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+
+            // Fallback response
+            return {
+                message: "Cuéntame más detalles sobre la regla que necesitas. ¿Qué tipo de transacciones o procesos quieres regular?",
+                questions: [
+                    "¿Para qué tipo de transacciones será esta regla?",
+                    "¿Hay montos específicos que debería considerar?",
+                    "¿En qué horarios o días debe aplicar?"
+                ],
+                is_ready_to_generate: false,
+                confidence_level: "bajo",
+                missing_information: ["Tipo de transacción", "Criterios específicos", "Acciones a tomar"],
+                summary_so_far: "El usuario quiere crear una regla de negocio pero necesito más información específica."
+            };
+
+        } catch (error) {
+            console.error('Error en conversación con Gemini:', error);
+            throw new Error('Error en la conversación: ' + error.message);
+        }
+    }
+
+    /**
+     * Test the API connection and list available models
+     * @returns {Promise<Object>} API status and available models
+     */
+    async testConnection() {
+        try {
+            // Try a simple generation to test connectivity
+            const result = await this.model.generateContent('Responde solo con "OK" si recibes este mensaje');
+            const response = await result.response;
+            const text = response.text();
+            
+            return {
+                status: 'success',
+                modelUsed: 'gemini-2.5-flash',
+                testResponse: text,
+                message: 'Conexión a Gemini API exitosa'
+            };
+        } catch (error) {
+            console.error('Prueba de Gemini API falló:', error);
+            return {
+                status: 'error',
+                error: error.message,
+                message: 'Error al conectar con Gemini API'
+            };
         }
     }
 }

@@ -145,6 +145,25 @@ export const rulesService = {
 
 // AI Services
 export const aiService = {
+  // Continue conversation with Gemini
+  async continueConversation(message, conversationHistory = []) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/continue-conversation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message, 
+          conversationHistory 
+        }),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
+
   // Test Gemini AI connection
   async testGemini(prompt) {
     try {
