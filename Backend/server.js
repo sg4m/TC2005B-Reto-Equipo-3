@@ -7,6 +7,7 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const rulesRoutes = require('./routes/rules');
 const aiRoutes = require('./routes/ai');
+const reportsRoutes = require('./routes/reports');
 
 // Import database connection
 const db = require('./config/database');
@@ -33,6 +34,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/rules', rulesRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check route with database test
 app.get('/api/health', async (req, res) => {

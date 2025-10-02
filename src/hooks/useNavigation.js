@@ -19,6 +19,10 @@ export const useNavigation = () => {
     navigate('/dashboard');
   };
 
+  const goToReports = () => {
+    navigate('/reports');
+  };
+
   const goBack = () => {
     navigate(-1);
   };
@@ -32,6 +36,7 @@ export const useNavigation = () => {
     goToRegister,
     goToForgotPassword,
     goToDashboard,
+    goToReports,
     goBack,
     goTo
   };

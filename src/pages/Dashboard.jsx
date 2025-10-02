@@ -1,38 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
 import { useNotification } from '../hooks/useNotification';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  IconButton, 
-  TextField,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  useTheme,
-  useMediaQuery,
-  Popper,
-  Paper,
-  ClickAwayListener,
-  Fade,
-  Divider,
-  Badge,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  OutlinedInput,
-  LinearProgress,
-  Chip,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+import { Box, Typography, Button, IconButton, TextField, Drawer, List, ListItem, ListItemButton, ListItemText, useTheme,
+useMediaQuery, Popper, Paper, ClickAwayListener, Fade, Divider, Badge, Dialog, DialogTitle, DialogContent, DialogContentText, 
+DialogActions, FormControl, InputLabel, OutlinedInput, LinearProgress, Chip, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -243,7 +214,7 @@ const Dashboard = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, active: true },
     { text: 'Reglas', icon: <RuleIcon />, active: false },
     { text: 'Simulador', icon: <PsychologyIcon />, active: false },
-    { text: 'Reportes', icon: <AssessmentIcon />, active: false },
+    { text: 'Reportes', icon: <AssessmentIcon />, active: true },
     { text: 'Historial', icon: <HistoryIcon />, active: false },
   ];
 
