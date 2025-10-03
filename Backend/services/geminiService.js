@@ -16,7 +16,7 @@ class GeminiService {
             }
         });
         
-        console.log('✅ Gemini service initialized with model: gemini-2.5-flash');
+        console.log('Gemini service initialized with model: gemini-2.5-flash');
     }
 
     /**

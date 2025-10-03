@@ -52,11 +52,11 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { usuario, contrasenia } = req.body;
-    console.log('🔐 Login attempt:', { usuario, contrasenia: '***' });
+    console.log('Login attempt:', { usuario, contrasenia: '***' });
 
     // Validate required fields
     if (!usuario || !contrasenia) {
-      console.log('❌ Missing credentials');
+      console.log('Missing credentials');
       return res.status(400).json({ 
         error: 'Usuario y contraseña son requeridos' 
       });
@@ -67,10 +67,10 @@ router.post('/login', async (req, res) => {
       'SELECT * FROM Usuario WHERE usuario = $1 OR correo = $1',
       [usuario]
     );
-    console.log('👤 User search result:', result.rows.length > 0 ? 'User found' : 'User not found');
+    console.log('User search result:', result.rows.length > 0 ? 'User found' : 'User not found');
 
     if (result.rows.length === 0) {
-      console.log('❌ User not found in database');
+      console.log('User not found in database');
       return res.status(401).json({ 
         error: 'Credenciales inválidas' 
       });
@@ -80,10 +80,10 @@ router.post('/login', async (req, res) => {
 
     // Verify password
     const isValidPassword = await bcrypt.compare(contrasenia, user.contrasenia);
-    console.log('🔑 Password verification:', isValidPassword ? 'Valid' : 'Invalid');
+    console.log('Password verification:', isValidPassword ? 'Valid' : 'Invalid');
 
     if (!isValidPassword) {
-      console.log('❌ Invalid password');
+      console.log('Invalid password');
       return res.status(401).json({ 
         error: 'Credenciales inválidas' 
       });

@@ -893,7 +893,7 @@ const Dashboard = () => {
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                     <Typography variant="h6" sx={{ color: '#333', fontWeight: 600 }}>
-                      💬 Conversación con Gemini
+                      Conversación con Gemini
                     </Typography>
                     <Button
                       size="small"
@@ -954,7 +954,7 @@ const Dashboard = () => {
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
                         }}>
                           <Typography variant="h6" sx={{ color: '#333', mb: 1 }}>
-                            💬 Conversación Iniciada
+                            Conversación Iniciada
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#666' }}>
                             Gemini te hará preguntas específicas para crear la regla perfecta
@@ -1118,7 +1118,7 @@ const Dashboard = () => {
                       textAlign: 'center'
                     }}>
                       <Typography variant="h6" sx={{ color: '#2e7d32', mb: 2 }}>
-                        ✅ ¡Listo para generar la regla!
+                        ¡Listo para generar la regla!
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#388e3c', mb: 3 }}>
                         Gemini ha recopilado suficiente información. ¿Quieres generar la regla ahora?
@@ -1150,14 +1150,14 @@ const Dashboard = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                   <LinearProgress sx={{ width: '100%', mb: 2 }} />
                   <Typography sx={{ color: '#666', textAlign: 'center' }}>
-                    🤖 Generando regla de negocio con Gemini AI...
+                    Generando regla de negocio con Gemini AI...
                   </Typography>
                 </Box>
               ) : aiResponse ? (
                 <Box sx={{ flex: 1, overflow: 'auto' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                     <Typography variant="h6" sx={{ color: '#333', fontWeight: 600 }}>
-                      ✨ Regla Generada por IA
+                      Regla Generada por IA
                     </Typography>
                     <Button
                       size="small"
@@ -1227,7 +1227,7 @@ const Dashboard = () => {
                   {aiResponse.summary && (
                     <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                        📋 Resumen:
+                        Resumen:
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#666' }}>
                         {aiResponse.summary}

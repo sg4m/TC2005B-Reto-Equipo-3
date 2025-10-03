@@ -59,6 +59,6 @@ app.get('/api/health', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Access at: http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Access at: http://localhost:${PORT}`);
 });
