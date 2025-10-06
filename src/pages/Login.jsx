@@ -307,7 +307,7 @@ const Login = () => {
                         Construye
                     </Typography>
                     <Typography variant="h6" align="center" sx={{ color: '#666', maxWidth: '220px', fontWeight: 400, lineHeight: 1.4 }}>
-                        Habla con nuestra IA para generar las reglas de negocio
+                        Genera tus reglas de negocio
                     </Typography>
                 </Stack>
                 <Stack direction="column" alignItems="center" spacing={2}>

@@ -2,23 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import reportsService from '../services/reportsService';
 
 export const useReports = () => {
-  const [reportsData, setReportsData] = useState({
-    activeRules: 0,
-    inactiveRules: 0,
-    simulationRules: 0,
-    totalUsers: 0,
-    activeUsers: 0,
-    mostUsedRuleId: '',
-    leastUsedRuleId: '',
-    lastCreatedRule: null,
-    lastModifiedRule: null,
-    mostSuccessfulRule: null
-  });
+  const [reportsData, setReportsData] = useState({});
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch reports data from backend
+  // Fetch reports data from mock service (frontend only)
   const fetchReportsData = useCallback(async () => {
     try {
       setLoading(true);
@@ -28,7 +17,7 @@ export const useReports = () => {
       setReportsData(data);
     } catch (err) {
       console.error('Error fetching reports data:', err);
-      setError(err.message || 'Error al cargar datos de reportes');
+      setError('Error al cargar datos de reportes');
     } finally {
       setLoading(false);
     }

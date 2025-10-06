@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
 import { useNotification } from '../hooks/useNotification';
+import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import { Box, Typography, Button, IconButton, TextField, Drawer, List, ListItem, ListItemButton, ListItemText, useTheme,
 useMediaQuery, Popper, Paper, ClickAwayListener, Fade, Divider, Badge, Dialog, DialogTitle, DialogContent, DialogContentText, 
 DialogActions, FormControl, InputLabel, OutlinedInput, LinearProgress, Chip, Accordion, AccordionSummary, AccordionDetails
@@ -61,30 +62,13 @@ const Dashboard = () => {
   
   // UI states - removed snackbar as we're using useNotification hook
   
-  // Dynamic notifications state
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'success',
-      title: 'Regla Creada',
-      message: 'Se creó una nueva regla exitosamente',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
-      read: false
-    },
-    {
-      id: 2,
-      type: 'info',
-      title: 'IA Conectada',
-      message: 'Gemini AI está listo para generar reglas',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-      read: false
-    }
-  ]);
-  
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { goToLogin } = useNavigation();
+  const { goToLogin, goToDashboard, goToReglas, goToSimulador, goToReports, goToHistorial } = useNavigation();
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
+  
+  // Global notifications hook
+  const { notifications, unreadCount, markAsRead, markAllAsRead, addNotification } = useGlobalNotifications();
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -130,20 +114,6 @@ const Dashboard = () => {
   // Load movements on component mount
   useEffect(() => {
     loadMovements();
-    
-    // Load notifications from localStorage (from other pages like ForgotPassword)
-    const storedNotifications = JSON.parse(localStorage.getItem('dashboardNotifications') || '[]');
-    if (storedNotifications.length > 0) {
-      setNotifications(prev => {
-        // Merge stored notifications with existing ones, avoiding duplicates
-        const existingIds = prev.map(n => n.id);
-        const newNotifications = storedNotifications.filter(n => !existingIds.includes(n.id));
-        return [...newNotifications, ...prev];
-      });
-      
-      // Clear stored notifications after loading
-      localStorage.removeItem('dashboardNotifications');
-    }
   }, [loadMovements]);
 
   // Check authentication status on component mount
@@ -152,26 +122,12 @@ const Dashboard = () => {
       // User is not authenticated, redirect to login
       goToLogin();
     } else if (!welcomeShownRef.current) {
-      // User is authenticated, show welcome message only once
+      // User is authenticated - no need for welcome notifications on every page visit
       welcomeShownRef.current = true;
-      const currentUser = authService.getCurrentUser();
-      if (currentUser) {
-        showSuccess(`¡Bienvenido, ${currentUser.usuario}!`, 4000);
-        
-        // Add welcome notification to bell system
-        addNotification('info', 'Bienvenido', `¡Hola ${currentUser.usuario}! Listo para generar reglas de negocio.`);
-      }
     }
   }, [goToLogin]);
 
-  // Auto-refresh notification timestamps every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNotifications(prev => [...prev]); // Force re-render to update timestamps
-    }, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, []);
+  // Note: Timestamp updates now handled by global notifications context
 
   // Show error using notification hook
   useEffect(() => {
@@ -180,7 +136,11 @@ const Dashboard = () => {
       showError(error);
       
       // Also add to the notification bell system
-      addNotification('error', 'Error del Sistema', error);
+      addNotification({
+        type: 'error',
+        title: 'Error del Sistema',
+        message: error
+      });
     }
   }, [error, showError]);
 
@@ -188,7 +148,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (conversationError) {
       showError(conversationError);
-      addNotification('error', 'Error en Conversación', conversationError);
+      addNotification({
+        type: 'error',
+        title: 'Error en Conversación',
+        message: conversationError
+      });
     }
   }, [conversationError, showError]);
 
@@ -211,17 +175,38 @@ const Dashboard = () => {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, active: true },
-    { text: 'Reglas', icon: <RuleIcon />, active: false },
-    { text: 'Simulador', icon: <PsychologyIcon />, active: false },
-    { text: 'Reportes', icon: <AssessmentIcon />, active: true },
-    { text: 'Historial', icon: <HistoryIcon />, active: false },
+    { text: 'Dashboard', icon: <DashboardIcon />, active: activeSection === 'Dashboard' },
+    { text: 'Reglas', icon: <RuleIcon />, active: activeSection === 'Reglas' },
+    { text: 'Simulador', icon: <PsychologyIcon />, active: activeSection === 'Simulador' },
+    { text: 'Reportes', icon: <AssessmentIcon />, active: activeSection === 'Reportes' },
+    { text: 'Historial', icon: <HistoryIcon />, active: activeSection === 'Historial' },
   ];
 
   const handleMenuItemClick = (itemText) => {
     setActiveSection(itemText);
     if (isMobile) {
       setMobileOpen(false);
+    }
+    
+    // Navigate to the appropriate page
+    switch (itemText) {
+      case 'Dashboard':
+        // Already on dashboard, no navigation needed
+        break;
+      case 'Reglas':
+        goToReglas();
+        break;
+      case 'Simulador':
+        goToSimulador();
+        break;
+      case 'Reportes':
+        goToReports();
+        break;
+      case 'Historial':
+        goToHistorial();
+        break;
+      default:
+        break;
     }
   };
 
@@ -289,11 +274,11 @@ const Dashboard = () => {
       });
 
       // Add notification for successful rule generation
-      addNotification(
-        'success',
-        'Regla Creada',
-        'Nueva regla de negocio generada desde conversación con IA'
-      );
+      addNotification({
+        type: 'success',
+        title: 'Regla Creada',
+        message: 'Nueva regla de negocio generada desde conversación con IA'
+      });
 
       showSuccess('¡Regla de negocio generada exitosamente!');
       
@@ -306,11 +291,11 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error generating rule from conversation:', err);
       
-      addNotification(
-        'error',
-        'Error en Generación',
-        'No se pudo generar la regla de negocio. Intenta nuevamente.'
-      );
+      addNotification({
+        type: 'error',
+        title: 'Error en Generación',
+        message: 'No se pudo generar la regla de negocio. Intenta nuevamente.'
+      });
       
       showError('Error al generar la regla. Intenta nuevamente.');
     }
@@ -335,11 +320,11 @@ const Dashboard = () => {
       });
 
       // Add notification for successful rule generation
-      addNotification(
-        'success',
-        'Regla Creada',
-        `Nueva regla de negocio generada: ${promptText.trim() || 'desde archivo'}`
-      );
+      addNotification({
+        type: 'success',
+        title: 'Regla Creada',
+        message: `Nueva regla de negocio generada: ${promptText.trim() || 'desde archivo'}`
+      });
 
       showSuccess('¡Regla de negocio generada exitosamente!');
       setPromptText('');
@@ -348,11 +333,11 @@ const Dashboard = () => {
       console.error('Error generating rule:', err);
       
       // Add notification for error
-      addNotification(
-        'error',
-        'Error en Generación',
-        'No se pudo generar la regla de negocio. Intenta nuevamente.'
-      );
+      addNotification({
+        type: 'error',
+        title: 'Error en Generación',
+        message: 'No se pudo generar la regla de negocio. Intenta nuevamente.'
+      });
       
       showError('Error al generar la regla. Intenta nuevamente.');
     }
@@ -376,7 +361,11 @@ const Dashboard = () => {
     authService.logout();
     
     // Add logout notification to bell system
-    addNotification('info', 'Sesión Cerrada', 'Has cerrado sesión exitosamente');
+    addNotification({
+      type: 'info',
+      title: 'Sesión Cerrada',
+      message: 'Has cerrado sesión exitosamente'
+    });
     
     // Show immediate feedback
     showInfo('Sesión cerrada exitosamente');
@@ -442,11 +431,11 @@ const Dashboard = () => {
         handleChangePasswordClose();
         
         // Add to notification bell system
-        addNotification(
-          'success',
-          'Contraseña Actualizada',
-          'Tu contraseña ha sido cambiada exitosamente por motivos de seguridad.'
-        );
+        addNotification({
+          type: 'success',
+          title: 'Contraseña Actualizada',
+          message: 'Tu contraseña ha sido cambiada exitosamente por motivos de seguridad.'
+        });
       } else {
         showError(result.message);
       }
@@ -525,10 +514,6 @@ const Dashboard = () => {
     role: 'Invitado'
   };
 
-
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
   // Time formatting function
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
@@ -548,30 +533,9 @@ const Dashboard = () => {
     }
   };
 
-  // Mark notification as read
-  const markNotificationAsRead = (notificationId) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === notificationId 
-          ? { ...notif, read: true }
-          : notif
-      )
-    );
-  };
+  // Note: markAsRead is now provided by useGlobalNotifications hook
 
-  // Add new notification (for rule generation)
-  const addNotification = (type, title, message) => {
-    const newNotification = {
-      id: Date.now(), // Simple ID generation
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false
-    };
-    
-    setNotifications(prev => [newNotification, ...prev]);
-  };
+  // Note: addNotification is now provided by useGlobalNotifications hook
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -731,87 +695,51 @@ const Dashboard = () => {
       }} />
       
       {/* Sidebar */}
-      <Box component="nav" sx={{ width: { xs: 'auto', md: desktopSidebarOpen ? drawerWidth : 0 }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
         <Drawer
-          variant="temporary"
-          open={mobileOpen}
+          variant={isMobile ? 'temporary' : 'permanent'}
+          open={isMobile ? mobileOpen : desktopSidebarOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
+          ModalProps={{
+            keepMounted: true,
+          }}
           sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
               width: drawerWidth,
-              backgroundColor: '#ffffff',
-              borderRight: '1px solid #e0e0e0'
+              boxSizing: 'border-box',
+              top: '64px',
+              height: 'calc(100vh - 64px)',
+              borderRight: '1px solid #E0E0E0',
+              backgroundColor: '#FAFAFA',
             },
           }}
         >
-          <Box sx={{ height: '66px' }} />
           <List sx={{ pt: 2 }}>
             {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ mb: 1, px: 2 }}>
+              <ListItem key={item.text} disablePadding>
                 <ListItemButton
                   onClick={() => handleMenuItemClick(item.text)}
                   sx={{
-                    backgroundColor: activeSection === item.text ? '#E0E0E0' : 'transparent',
+                    mx: 2,
+                    mb: 1,
                     borderRadius: '8px',
+                    backgroundColor: item.active ? 'rgba(235, 0, 41, 0.08)' : 'transparent',
+                    color: item.active ? '#EB0029' : '#666',
                     '&:hover': {
-                      backgroundColor: activeSection === item.text ? '#E0E0E0' : '#F5F5F5',
-                    }
+                      backgroundColor: item.active ? 'rgba(235, 0, 41, 0.12)' : 'rgba(0, 0, 0, 0.04)',
+                    },
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                    {React.cloneElement(item.icon, { 
-                      sx: { 
-                        color: activeSection === item.text ? '#333' : '#666',
-                        fontSize: '20px'
-                      } 
-                    })}
-                    <ListItemText primary={item.text} />
+                  <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+                    {item.icon}
                   </Box>
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Drawer>
-        
-        <Drawer
-          variant="persistent"
-          sx={{
-            display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: drawerWidth,
-              backgroundColor: '#ffffff',
-              borderRight: '1px solid #e0e0e0'
-            },
-          }}
-          open={desktopSidebarOpen}
-        >
-          <Box sx={{ height: '66px' }} />
-          <List sx={{ pt: 2 }}>
-            {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ mb: 1, px: 2 }}>
-                <ListItemButton
-                  onClick={() => handleMenuItemClick(item.text)}
-                  sx={{
-                    backgroundColor: activeSection === item.text ? '#E0E0E0' : 'transparent',
-                    borderRadius: '8px',
-                    '&:hover': {
-                      backgroundColor: activeSection === item.text ? '#E0E0E0' : '#F5F5F5',
-                    }
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                    {React.cloneElement(item.icon, { 
-                      sx: { 
-                        color: activeSection === item.text ? '#333' : '#666',
-                        fontSize: '20px'
-                      } 
-                    })}
-                    <ListItemText primary={item.text} />
-                  </Box>
+                  <ListItemText 
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontSize: '14px',
+                      fontWeight: item.active ? 600 : 400
+                    }}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}
@@ -1729,7 +1657,7 @@ const Dashboard = () => {
                             backgroundColor: '#f5f5f5'
                           }
                         }}
-                        onClick={() => markNotificationAsRead(notification.id)}
+                        onClick={() => markAsRead(notification.id)}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
                             {getNotificationIcon(notification.type)}
@@ -1787,28 +1715,7 @@ const Dashboard = () => {
                     ))}
                   </Box>
 
-                  <Box sx={{ 
-                    p: 2,
-                    borderTop: '1px solid #e0e0e0',
-                    backgroundColor: '#f8f9fa'
-                  }}>
-                    <Button
-                      fullWidth
-                      variant="text"
-                      size="small"
-                      sx={{
-                        color: '#EB0029',
-                        textTransform: 'none',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        '&:hover': {
-                          backgroundColor: 'rgba(235, 0, 41, 0.04)'
-                        }
-                      }}
-                    >
-                      Ver todas las notificaciones
-                    </Button>
-                  </Box>
+
                 </Box>
               </ClickAwayListener>
             </Paper>

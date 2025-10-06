@@ -20,7 +20,19 @@ export const useNavigation = () => {
   };
 
   const goToReports = () => {
-    navigate('/reports');
+    navigate('/reportes');
+  };
+
+  const goToReglas = () => {
+    navigate('/reglas');
+  };
+
+  const goToSimulador = () => {
+    navigate('/simulador');
+  };
+
+  const goToHistorial = () => {
+    navigate('/historial');
   };
 
   const goBack = () => {
@@ -37,6 +49,9 @@ export const useNavigation = () => {
     goToForgotPassword,
     goToDashboard,
     goToReports,
+    goToReglas,
+    goToSimulador,
+    goToHistorial,
     goBack,
     goTo
   };
