@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
 import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
+import { useHistorial } from '../hooks/useHistorial';
 import {
   Box, Typography, Button, IconButton, 
   Drawer, List, ListItem, ListItemButton, ListItemText,
@@ -57,12 +58,21 @@ const Historial = () => {
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   
   // Historial page states
-  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBy, setFilterBy] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [rulesHistory, setRulesHistory] = useState([]);
+  
+  // Historial hook for backend integration
+  const { 
+    historialData, 
+    filteredData, 
+    stats, 
+    loading, 
+    error: historialError, 
+    fetchFilteredData, 
+    refreshData 
+  } = useHistorial();
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -76,6 +86,7 @@ const Historial = () => {
   const profileRef = useRef(null);
   const welcomeShownRef = useRef(false);
   const lastErrorRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
   
 
 
@@ -87,30 +98,54 @@ const Historial = () => {
       // Welcome notifications removed - no longer needed on each page visit
       welcomeShownRef.current = true;
     }
-    // Don't load data automatically - wait for backend integration
+    // Data loading is now handled by useHistorial hook automatically
   }, [goToLogin]);
+
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+
   
-  // Load historial data (ready for backend integration)
+  // Load historial data (now connected to backend)
   const loadHistorialData = () => {
-    setLoading(true);
-    
-    // Simulate API call - will be replaced with real backend call
-    setTimeout(() => {
-      // Return empty array - ready for backend integration
-      setRulesHistory([]);
-      setLoading(false);
-    }, 500);
+    refreshData();
   };
   
-  // Handle search
+  // Handle search with simple debouncing
   const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
+    const newSearchTerm = event.target.value;
+    setSearchTerm(newSearchTerm);
+    setPage(0); // Reset to first page when search changes
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      if (fetchFilteredData && !loading) {
+        fetchFilteredData(newSearchTerm, filterBy);
+      }
+    }, 300);
   };
   
   // Handle filter change
   const handleFilterChange = (event) => {
-    setFilterBy(event.target.value);
+    const newFilterBy = event.target.value;
+    setFilterBy(newFilterBy);
     setPage(0); // Reset to first page when filter changes
+    
+    // Apply filter immediately
+    if (fetchFilteredData && !loading) {
+      fetchFilteredData(searchTerm, newFilterBy);
+    }
   };
   
   // Handle refresh
@@ -133,32 +168,20 @@ const Historial = () => {
     setPage(0);
   };
   
-  // Filter rules based on search term and filter option
-  const filteredRules = rulesHistory.filter(rule => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    
-    switch (filterBy) {
-      case 'id':
-        return rule.id.toLowerCase().includes(searchLower);
-      case 'time':
-        return formatDate(rule.createdAt).toLowerCase().includes(searchLower);
-      case 'summary':
-        return rule.summary.toLowerCase().includes(searchLower);
-      case 'all':
-      default:
-        return (
-          rule.id.toLowerCase().includes(searchLower) ||
-          rule.summary.toLowerCase().includes(searchLower) ||
-          formatDate(rule.createdAt).toLowerCase().includes(searchLower)
-        );
-    }
-  });
+  // Use filtered data from backend
+  const filteredRules = filteredData || [];
   
   // Format date for display
   const formatDate = (date) => {
-    return date.toLocaleDateString('es-MX', {
+    if (!date) return 'N/A';
+    
+    // Handle both Date objects and date strings
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) return 'Fecha inválida';
+    
+    return dateObj.toLocaleDateString('es-MX', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -665,7 +688,7 @@ const Historial = () => {
           </Box>
 
           {/* Show "No information" message when no data */}
-          {!loading && rulesHistory.length === 0 ? (
+          {!loading && historialData.length === 0 ? (
             <Box sx={{ 
               textAlign: 'center', 
               py: 8, 
@@ -674,10 +697,10 @@ const Historial = () => {
               border: '1px solid #e0e0e0'
             }}>
               <Typography variant="h6" sx={{ color: '#666', mb: 2 }}>
-                No hay información por mostrar
+                {historialError ? 'Error al cargar datos' : 'No hay información por mostrar'}
               </Typography>
               <Typography variant="body2" sx={{ color: '#999' }}>
-                El historial de reglas aparecerá aquí cuando esté disponible
+                {historialError ? historialError : 'El historial de reglas aparecerá aquí cuando esté disponible'}
               </Typography>
             </Box>
           ) : (

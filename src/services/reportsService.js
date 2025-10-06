@@ -1,161 +1,258 @@
 // ==========================================
-// REPORTS SERVICE - FRONTEND ONLY VERSION
+// REPORTS SERVICE - BACKEND CONNECTED VERSION
 // ==========================================
-// This service uses mock data instead of backend API calls
-// to allow frontend development without backend dependencies
+// This service connects to the backend API endpoints
 
-// Mock data for reports - Frontend only
-const mockReportsData = {
-  activeRules: 45,
-  inactiveRules: 12,
-  simulationRules: 8,
-  totalUsers: 127,
-  activeUsers: 89,
-  mostUsedRuleId: 'RULE-001',
-  leastUsedRuleId: 'RULE-023',
-  lastCreatedRule: {
-    id_regla: 'RULE-045',
-    nombre: 'Validación de Transferencias Internacionales',
-    descripcion: 'Regla para validar límites en transferencias internacionales',
-    estado: 'activo',
-    fecha_creacion: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  lastModifiedRule: {
-    id_regla: 'RULE-032',
-    nombre: 'Control de Retiros ATM',
-    descripcion: 'Regla actualizada para control de retiros en cajeros automáticos',
-    estado: 'activo',
-    fecha_modificacion: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  mostSuccessfulRule: {
-    id_regla: 'RULE-015',
-    nombre: 'Detección de Fraude en Línea',
-    descripcion: 'Sistema de detección automatizada de transacciones fraudulentas',
-    success_rate: 94.5,
-    total_executions: 1250,
-    successful_executions: 1181
+// API Base Configuration
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// Helper function to handle API responses
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP Error: ${response.status}`);
   }
+  return await response.json();
 };
 
-const mockRulesStats = {
-  activo: 45,
-  inactivo: 12,
-  simulacion: 8,
-  pendiente: 3
-};
-
-const mockUsersStats = {
-  totalUsers: 127,
-  activeUsers: 89
+// Helper function to handle network errors
+const handleNetworkError = (error) => {
+  if (error.name === 'TypeError' && error.message.includes('fetch')) {
+    throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté ejecutándose.');
+  }
+  throw error;
 };
 
 class ReportsService {
-  // Get comprehensive reports data - Mock version
+  // Get comprehensive reports data from backend
   async getReportsData() {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Return empty data for now - ready for backend integration
-    return {};
+    try {
+      // Fetch data from working endpoints only
+      const [rulesStats, usersStats, dashboard] = await Promise.all([
+        this.getRulesStats().catch(err => {
+          console.warn('Rules stats failed:', err);
+          return {};
+        }),
+        this.getUsersStats().catch(err => {
+          console.warn('Users stats failed:', err);
+          return {};
+        }),
+        this.getDashboardData().catch(err => {
+          console.warn('Dashboard data failed:', err);
+          return {};
+        })
+      ]);
+
+      // Combine all data into a single object with fallbacks
+      return {
+        // Rules statistics - map the correct field names from backend
+        activeRules: rulesStats.Activa || 0,
+        inactiveRules: rulesStats.Inactiva || 0,
+        simulationRules: rulesStats.Simulacion || 0,
+        
+        // Users statistics
+        totalUsers: usersStats.totalUsers || 0,
+        activeUsers: usersStats.activeUsers || 0,
+        
+        // Recent activity data
+        recentActivity: dashboard.recentActivity || null,
+        
+        // Most successful rule
+        mostSuccessfulRule: dashboard.mostSuccessfulRule || null,
+        
+        // Usage statistics (placeholder for now)
+        mostUsedRuleId: dashboard.mostUsedRuleId || '--',
+        leastUsedRuleId: dashboard.leastUsedRuleId || '--'
+      };
+    } catch (error) {
+      console.error('Error fetching reports data:', error);
+      handleNetworkError(error);
+    }
   }
 
-  // Get rules statistics - Mock version
+  // Get rules statistics from backend
   async getRulesStats() {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    // Return empty data for now - ready for backend integration
-    return {};
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/rules-stats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching rules stats:', error);
+      handleNetworkError(error);
+    }
   }
 
-  // Get users statistics - Mock version
+  // Get users statistics from backend
   async getUsersStats() {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    // Return empty data for now - ready for backend integration
-    return {};
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/users-stats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching users stats:', error);
+      handleNetworkError(error);
+    }
   }
 
-  // Export data as PDF - Mock version
+  // Get dashboard data (recent activity, most successful rule)
+  async getDashboardData() {
+    try {
+      // For now, since we don't have historial_reglas table, we'll return basic placeholder data
+      // This can be enhanced once the database schema includes execution history
+      return {
+        recentActivity: {
+          lastCreated: {
+            id: '--',
+            createdDate: '--',
+            details: 'Información no disponible (requiere tabla historial_reglas)'
+          },
+          lastModified: {
+            id: '--',
+            modifiedDate: '--',
+            details: 'Información no disponible (requiere tabla historial_reglas)'
+          }
+        },
+        
+        mostSuccessfulRule: {
+          id: '--',
+          createdDate: '--',
+          publishedDate: '--', 
+          affectedUsers: '--',
+          successRate: '--'
+        },
+        
+        // These would be available if we had usage tracking
+        mostUsedRuleId: '--',
+        leastUsedRuleId: '--'
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Return null instead of throwing error to allow partial data loading
+      return {
+        recentActivity: null,
+        mostSuccessfulRule: null
+      };
+    }
+  }
+
+  // Export data as PDF from backend
   async exportToPDF() {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
-    
-    // Create mock PDF content
-    const mockPdfContent = `Reporte de Reglas de Negocio - ${new Date().toLocaleDateString()}
-    
-Estadísticas:
-- Reglas Activas: ${mockReportsData.activeRules}
-- Reglas Inactivas: ${mockReportsData.inactiveRules}
-- Reglas en Simulación: ${mockReportsData.simulationRules}
-- Total de Usuarios: ${mockReportsData.totalUsers}
-- Usuarios Activos: ${mockReportsData.activeUsers}
-
-Última Regla Creada: ${mockReportsData.lastCreatedRule.nombre}
-Regla Más Exitosa: ${mockReportsData.mostSuccessfulRule.nombre} (${mockReportsData.mostSuccessfulRule.success_rate}% éxito)`;
-
-    // Create a mock blob
-    const blob = new Blob([mockPdfContent], { type: 'application/pdf' });
-    return blob;
-  }
-
-  // Export data as CSV - Mock version
-  async exportToCSV() {
-    await new Promise(resolve => setTimeout(resolve, 800)); // Simulate processing time
-    
-    // Create mock CSV content
-    const csvContent = `ID,Nombre,Descripcion,Estado,Fecha Creacion,Ejecuciones,Tasa de Exito
-RULE-001,Validación de Saldos,Control de saldos mínimos,activo,2025-01-15,1250,95.2%
-RULE-002,Límites de Transferencia,Control de límites diarios,activo,2025-01-20,890,92.8%
-RULE-003,Detección de Fraude,Sistema antifraude,activo,2025-02-01,2100,94.5%
-RULE-004,Validación KYC,Know Your Customer,inactivo,2025-02-05,450,88.9%
-RULE-005,Control ATM,Límites de retiro,simulacion,2025-02-10,120,91.7%`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    return blob;
-  }
-
-  // Get filtered reports data - Mock version
-  async getFilteredReports(filters = {}) {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    // Mock filtered data based on filters
-    const mockFilteredData = [
-      {
-        id_regla: 'RULE-001',
-        nombre: 'Validación de Saldos',
-        descripcion: 'Control automatizado de saldos mínimos en cuentas',
-        estado: 'activo',
-        fecha_creacion: '2025-01-15',
-        total_executions: 1250,
-        successful_executions: 1190,
-        success_rate: 95.2
-      },
-      {
-        id_regla: 'RULE-002',
-        nombre: 'Límites de Transferencia',
-        descripcion: 'Control de límites diarios y mensuales en transferencias',
-        estado: 'activo',
-        fecha_creacion: '2025-01-20',
-        total_executions: 890,
-        successful_executions: 826,
-        success_rate: 92.8
-      },
-      {
-        id_regla: 'RULE-003',
-        nombre: 'Detección de Fraude en Línea',
-        descripcion: 'Sistema de detección automatizada de transacciones fraudulentas',
-        estado: 'activo',
-        fecha_creacion: '2025-02-01',
-        total_executions: 2100,
-        successful_executions: 1984,
-        success_rate: 94.5
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/export/pdf`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
       }
-    ];
+      
+      // The backend returns PDF binary data - use blob() to handle properly
+      const blob = await response.blob();
+      
+      // Ensure the blob has the correct MIME type
+      if (blob.type !== 'application/pdf') {
+        // If the backend didn't set the correct type, create a new blob with the right type
+        return new Blob([blob], { type: 'application/pdf' });
+      }
+      
+      return blob;
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      handleNetworkError(error);
+    }
+  }
+
+  // Export data as CSV from backend  
+  async exportToCSV() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/export/csv`, {
+        method: 'GET',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+      
+      // The backend returns CSV formatted data as text
+      const csvData = await response.text();
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      return blob;
+    } catch (error) {
+      console.error('Error exporting to CSV:', error);
+      handleNetworkError(error);
+    }
+  }
+
+  // Helper method to format data for PDF-like display
+  formatDataForPDF(data) {
+    const currentDate = new Date().toLocaleDateString('es-MX');
+    let content = `Reporte de Reglas de Negocio - ${currentDate}\n\n`;
     
-    // Apply basic filtering (for demo purposes)
-    let filteredData = mockFilteredData;
-    
-    if (filters.estado) {
-      filteredData = filteredData.filter(item => item.estado === filters.estado);
+    if (data && Array.isArray(data) && data.length > 0) {
+      content += `Resumen de Reglas:\n`;
+      content += `===================\n\n`;
+      
+      data.forEach((rule, index) => {
+        content += `${index + 1}. ${rule.nombre || 'Sin nombre'}\n`;
+        content += `   ID: ${rule.id_regla || 'N/A'}\n`;
+        content += `   Descripción: ${rule.descripcion || 'Sin descripción'}\n`;
+        content += `   Estado: ${rule.status || 'N/A'}\n`;
+        content += `   Fecha de creación: ${rule.fecha_creacion ? new Date(rule.fecha_creacion).toLocaleDateString('es-MX') : 'N/A'}\n`;
+        content += `   Total de ejecuciones: ${rule.total_executions || 0}\n`;
+        content += `   Ejecuciones exitosas: ${rule.successful_executions || 0}\n`;
+        content += `\n`;
+      });
+    } else {
+      content += `No hay datos disponibles para mostrar.\n`;
     }
     
-    return filteredData;
+    return content;
+  }
+
+  // Get filtered reports data from backend
+  async getFilteredReports(filters = {}) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/filtered`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filters),
+      });
+      
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching filtered reports:', error);
+      handleNetworkError(error);
+    }
+  }
+
+  // Get all rules with detailed information
+  async getAllRulesDetails() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/rules-details`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching rules details:', error);
+      handleNetworkError(error);
+    }
   }
 }
 

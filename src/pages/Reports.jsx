@@ -3,6 +3,7 @@ import authService from '../services/authService';
 import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import { useReports } from '../hooks/useReports';
+import { useBusinessRules } from '../hooks/useBusinessRules';
 
 // Suppress MUI Grid deprecation warnings during development
 console.warn = function(message) {
@@ -51,6 +52,8 @@ import {
   CardContent,
   Grid,
   CircularProgress,
+  LinearProgress,
+  Chip,
   Tooltip
 } from '@mui/material';
 import {
@@ -105,6 +108,13 @@ const Reports = () => {
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
   const { reportsData, loading, error, refreshData, exportToPDF, exportToCSV } = useReports();
   
+  // Business rules hook for recent movements (same as Dashboard)
+  const {
+    isLoading: movementsLoading,
+    movements,
+    loadMovements
+  } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
+  
   // Global notifications hook
   const { notifications, unreadCount, markAsRead, markAllAsRead, addNotification } = useGlobalNotifications();
   
@@ -131,6 +141,11 @@ const Reports = () => {
       showError('Error al descargar CSV');
     }
   };
+
+  // Load recent movements on component mount
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -285,11 +300,15 @@ const Reports = () => {
         throw new Error('Usuario no autenticado');
       }
 
-      // Here you would call the change password API
-      // await authService.changePassword(currentPassword, newPassword);
+      // Call the change password API
+      const result = await authService.changePassword(currentPassword, newPassword);
       
-      showSuccess('Contraseña cambiada exitosamente');
-      handleChangePasswordClose();
+      if (result.success) {
+        showSuccess('Contraseña cambiada exitosamente');
+        handleChangePasswordClose();
+      } else {
+        showError(result.message || 'Error al cambiar contraseña');
+      }
     } catch (error) {
       showError(error.message || 'Error al cambiar contraseña');
     } finally {
@@ -544,9 +563,6 @@ const Reports = () => {
               }}>
                 Reportes de reglas de negocio
               </Typography>
-              <Typography variant="body1" sx={{ color: '#666' }}>
-                Análisis y estadísticas del sistema de reglas
-              </Typography>
             </Box>
             
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -581,8 +597,25 @@ const Reports = () => {
               </Button>
               
               <Button
+                variant="outlined"
+                startIcon={<CsvIcon />}
+                onClick={handleExportCSV}
+                disabled={loading}
+                sx={{
+                  borderColor: '#EB0029',
+                  color: '#EB0029',
+                  '&:hover': {
+                    backgroundColor: 'rgba(235, 0, 41, 0.04)',
+                    borderColor: '#D32F2F'
+                  }
+                }}
+              >
+                Exportar CSV
+              </Button>
+              
+              <Button
                 variant="contained"
-                startIcon={<GetAppIcon />}
+                startIcon={<PdfIcon />}
                 onClick={handleExportPDF}
                 disabled={loading}
                 sx={{
@@ -590,7 +623,7 @@ const Reports = () => {
                   '&:hover': { bgcolor: '#D32F2F' }
                 }}
               >
-                Exportar PDF/CSV
+                Exportar PDF
               </Button>
             </Box>
           </Box>
@@ -737,182 +770,74 @@ const Reports = () => {
 
           {/* Detailed Information Cards */}
           <Grid container spacing={3}>
-            {/* Rule Usage Statistics */}
-            <Grid item xs={12} md={6}>
-              <Card sx={{ 
-                backgroundColor: 'white',
-                border: '1px solid #e0e0e0',
-                borderRadius: '12px'
-              }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ 
-                    fontWeight: 600, 
-                    color: '#333', 
-                    mb: 3,
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <AssessmentIcon sx={{ mr: 1, color: '#EB0029' }} />
-                    Estadísticas de Uso
-                  </Typography>
-                  
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                      ID Regla más usada:
-                    </Typography>
-                    <Typography variant="h6" sx={{ color: '#EB0029', fontWeight: 600 }}>
-                      {loading ? '...' : reportsData.mostUsedRuleId || '--'}
-                    </Typography>
-                  </Box>
-                  
-                  <Box>
-                    <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                      ID Regla menos usada:
-                    </Typography>
-                    <Typography variant="h6" sx={{ color: '#666', fontWeight: 600 }}>
-                      {loading ? '...' : reportsData.leastUsedRuleId || '--'}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
+
 
             {/* Recent Rules Activity */}
             <Grid item xs={12} md={6}>
               <Card sx={{ 
                 backgroundColor: 'white',
                 border: '1px solid #e0e0e0',
-                borderRadius: '12px'
+                borderRadius: '12px',
+                overflow: 'hidden'
               }}>
                 <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ 
-                    fontWeight: 600, 
-                    color: '#333', 
-                    mb: 3,
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <HistoryIcon sx={{ mr: 1, color: '#EB0029' }} />
-                    Actividad Reciente
-                  </Typography>
-                  
-                  {reportsData.recentActivity && reportsData.recentActivity.length > 0 ? (
-                    <>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                          Última regla creada:
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
-                          • {reportsData.recentActivity.lastCreated?.id || '--'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#666' }}>
-                          {reportsData.recentActivity.lastCreated?.createdDate || '--'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
-                          {reportsData.recentActivity.lastCreated?.details || '--'}
-                        </Typography>
-                      </Box>
-                      
-                      <Divider sx={{ my: 2 }} />
-                      
-                      <Box>
-                        <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                          Última regla modificada:
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#333' }}>
-                          • {reportsData.recentActivity.lastModified?.id || '--'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#666' }}>
-                          {reportsData.recentActivity.lastModified?.modifiedDate || '--'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
-                          {reportsData.recentActivity.lastModified?.details || '--'}
-                        </Typography>
-                      </Box>
-                    </>
-                  ) : (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" sx={{ color: '#666' }}>
-                        No hay información por mostrar
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Success Rate */}
-            <Grid item xs={12}>
-              <Card sx={{ 
-                backgroundColor: 'white',
-                border: '1px solid #e0e0e0',
-                borderRadius: '12px'
-              }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                     <Typography variant="h6" sx={{ 
                       fontWeight: 600, 
                       color: '#333',
                       display: 'flex',
                       alignItems: 'center'
                     }}>
-                      <TrendingUpIcon sx={{ mr: 1, color: '#EB0029', alignItems: 'center' }} />
-                      Regla más exitosa
-                    </Typography>                   
+                      <HistoryIcon sx={{ mr: 1, color: '#EB0029' }} />
+                      Actividad Reciente
+                    </Typography>
+                    <IconButton size="small" onClick={loadMovements} disabled={movementsLoading}>
+                      <RefreshIcon />
+                    </IconButton>
                   </Box>
-                  
-                  {reportsData.mostSuccessfulRule ? (
-                    <Grid container spacing={4}>
-                      <Grid item xs={12} md={8}>
-                        <Box>
-                          <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                            ID de la regla:
+
+                  <Box sx={{ overflow: 'auto', maxHeight: '300px' }}>
+                    {movementsLoading ? (
+                      <Box sx={{ py: 4 }}>
+                        <LinearProgress />
+                      </Box>
+                    ) : movements.length > 0 ? (
+                      movements.map((movement, index) => (
+                        <Box 
+                          key={movement.id || index}
+                          sx={{ 
+                            py: 1.5, 
+                            borderBottom: index < movements.length - 1 ? '1px solid #f0f0f0' : 'none'
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontSize: '13px', mb: 0.5 }}>
+                            • {movement.description}
                           </Typography>
-                          <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 600, mb: 2 }}>
-                            {reportsData.mostSuccessfulRule.id || '--'}
-                          </Typography>
-                          
-                          <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                            Detalles:
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#333', mb: 1 }}>
-                            • Creada el {reportsData.mostSuccessfulRule.createdDate || '--'}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#333', mb: 1 }}>
-                            • Publicada el {reportsData.mostSuccessfulRule.publishedDate || '--'}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#333' }}>
-                            • Usuarios afectados: {reportsData.mostSuccessfulRule.affectedUsers || '--'}
-                          </Typography>
+                          {movement.status && (
+                            <Chip 
+                              label={movement.status} 
+                              size="small" 
+                              sx={{ 
+                                height: '18px',
+                                fontSize: '10px',
+                                backgroundColor: movement.status === 'Activa' ? '#e8f5e8' : '#f0f0f0'
+                              }} 
+                            />
+                          )}
                         </Box>
-                      </Grid>
-                      
-                      <Grid item xs={12} md={4}>
-                        <Box sx={{ textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#666' }}>
-                            Tasa de éxito
-                          </Typography>
-                          <Typography variant="h3" sx={{ 
-                            color: '#4caf50', 
-                            fontWeight: 700,
-                            display: 'block'
-                          }}>
-                            {reportsData.mostSuccessfulRule.successRate || '--'}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  ) : (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" sx={{ color: '#666' }}>
-                        No hay información por mostrar
-                      </Typography>
-                    </Box>
-                  )}
+                      ))
+                    ) : (
+                      <Box sx={{ py: 4, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#666' }}>
+                          No hay movimientos recientes
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
-          </Grid>
+         </Grid>
         </Box>
       </Box>
 

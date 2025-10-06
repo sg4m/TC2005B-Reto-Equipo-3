@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const PDFDocument = require('pdfkit');
 
 // Get comprehensive reports data
 router.get('/data', async (req, res) => {
@@ -160,20 +161,19 @@ router.get('/rules-stats', async (req, res) => {
 router.get('/users-stats', async (req, res) => {
   try {
     const totalUsersQuery = `SELECT COUNT(*) as count FROM usuario`;
-    const activeUsersQuery = `
-      SELECT COUNT(*) as count 
-      FROM usuario 
-      WHERE ultimo_acceso > NOW() - INTERVAL '30 days'
-    `;
+    // Since we don't have ultimo_acceso column, we'll just use total users for now
+    // In a real scenario, you would add a last_login or ultimo_acceso column to track this
     
-    const [totalResult, activeResult] = await Promise.all([
-      db.query(totalUsersQuery),
-      db.query(activeUsersQuery)
-    ]);
+    const totalResult = await db.query(totalUsersQuery);
+    const totalUsers = parseInt(totalResult.rows[0]?.count || 0);
+    
+    // For now, assume all users are active since we don't have last access data
+    // You can modify this once you add a last_login column to the usuario table
+    const activeUsers = totalUsers;
 
     const stats = {
-      totalUsers: parseInt(totalResult.rows[0]?.count || 0),
-      activeUsers: parseInt(activeResult.rows[0]?.count || 0)
+      totalUsers: totalUsers,
+      activeUsers: activeUsers
     };
 
     res.json(stats);
@@ -189,42 +189,34 @@ router.get('/users-stats', async (req, res) => {
 // Export reports data as CSV
 router.get('/export/csv', async (req, res) => {
   try {
-    // Get comprehensive data for CSV export
+    // Get comprehensive data for CSV export (using only existing columns)
     const rulesQuery = `
       SELECT 
-        r.id_regla,
-        r.nombre,
-        r.descripcion,
-        r.status,
-        r.fecha_creacion,
-        r.fecha_modificacion,
-        COUNT(h.id) as total_executions,
-        COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
-      FROM reglanegocio r
-      LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion
-      ORDER BY r.fecha_creacion DESC
+        id_regla,
+        status,
+        fecha_creacion,
+        input_usuario,
+        resumen,
+        archivo_original,
+        regla_estandarizada
+      FROM reglanegocio
+      ORDER BY fecha_creacion DESC
     `;
     
     const result = await db.query(rulesQuery);
     
     // Create CSV content
-    const csvHeader = 'ID Regla,Nombre,Descripcion,Estado,Fecha Creacion,Fecha Modificacion,Total Ejecuciones,Ejecuciones Exitosas,Tasa de Exito\n';
+    const csvHeader = 'ID Regla,Estado,Fecha Creacion,Input Usuario,Resumen,Archivo Original,Regla Estandarizada\n';
     const csvContent = result.rows.map(row => {
-      const successRate = row.total_executions > 0 
-        ? ((row.successful_executions / row.total_executions) * 100).toFixed(2) + '%'
-        : '0%';
-      
+      const reglaEstandarizada = row.regla_estandarizada ? String(row.regla_estandarizada).substring(0, 100) : '';
       return [
-        row.id_regla,
-        `"${row.nombre || ''}"`,
-        `"${row.descripcion || ''}"`,
-        row.status,
+        row.id_regla || '',
+        row.status || '',
         row.fecha_creacion ? new Date(row.fecha_creacion).toISOString().split('T')[0] : '',
-        row.fecha_modificacion ? new Date(row.fecha_modificacion).toISOString().split('T')[0] : '',
-        row.total_executions || 0,
-        row.successful_executions || 0,
-        successRate
+        `"${(row.input_usuario || '').replace(/"/g, '""')}"`,
+        `"${(row.resumen || '').replace(/"/g, '""')}"`,
+        `"${(row.archivo_original || '').replace(/"/g, '""')}"`,
+        `"${reglaEstandarizada.replace(/"/g, '""')}..."`
       ].join(',');
     }).join('\n');
 
@@ -242,50 +234,147 @@ router.get('/export/csv', async (req, res) => {
   }
 });
 
-// Export reports data as PDF (simplified - returns JSON for now, can be enhanced with PDF library)
+// Export reports data as PDF using PDFKit
 router.get('/export/pdf', async (req, res) => {
   try {
-    // For now, we'll return the data as JSON
-    // In a real implementation, you'd use a PDF library like puppeteer or pdfkit
     const dataQuery = `
       SELECT 
-        r.id_regla,
-        r.nombre,
-        r.descripcion,
-        r.status,
-        r.fecha_creacion,
-        r.fecha_modificacion,
-        COUNT(h.id) as total_executions,
-        COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
-      FROM reglanegocio r
-      LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion
-      ORDER BY r.fecha_creacion DESC
+        id_regla,
+        status,
+        fecha_creacion,
+        input_usuario,
+        resumen,
+        regla_estandarizada
+      FROM reglanegocio
+      ORDER BY fecha_creacion DESC
     `;
     
     const result = await db.query(dataQuery);
     
-    // Create a simple text-based report for PDF
-    const reportContent = {
-      title: 'Reporte de Reglas de Negocio',
-      generatedAt: new Date().toISOString(),
-      data: result.rows.map(row => ({
-        ...row,
-        success_rate: row.total_executions > 0 
-          ? ((row.successful_executions / row.total_executions) * 100).toFixed(2) + '%'
-          : '0%'
-      }))
-    };
+    // Set response headers before creating the document
+    const filename = `reporte-reglas-${new Date().toISOString().split('T')[0]}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader('Cache-Control', 'no-cache');
     
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="reporte-reglas-${new Date().toISOString().split('T')[0]}.json"`);
-    res.json(reportContent);
+    // Create PDF document with buffer option for proper streaming
+    const doc = new PDFDocument({ 
+      margin: 50,
+      bufferPages: true,
+      autoFirstPage: true
+    });
+    
+    // Create a buffer to collect PDF data
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader('Content-Length', pdfData.length);
+      res.end(pdfData);
+    });
+    
+    // Add title
+    doc.fontSize(20)
+       .font('Helvetica-Bold')
+       .text('REPORTE DE REGLAS DE NEGOCIO', 50, 50, { align: 'center', width: 495 });
+    
+    // Add generation date
+    const currentDate = new Date().toLocaleDateString('es-MX');
+    doc.fontSize(12)
+       .font('Helvetica')
+       .text(`Generado el: ${currentDate}`, 50, 90, { align: 'center', width: 495 })
+       .moveDown(2);
+    
+    // Add separator line
+    const yPos = doc.y;
+    doc.moveTo(50, yPos)
+       .lineTo(545, yPos)
+       .stroke()
+       .moveDown(2);
+    
+    if (result.rows.length > 0) {
+      result.rows.forEach((rule, index) => {
+        // Check if we need a new page
+        if (doc.y > 650) {
+          doc.addPage();
+        }
+        
+        // Rule header with better spacing
+        doc.fontSize(14)
+           .font('Helvetica-Bold')
+           .text(`${index + 1}. Regla ID: ${rule.id_regla}`, 50, doc.y, { continued: false })
+           .moveDown(0.3);
+        
+        // Rule details with consistent formatting
+        doc.fontSize(10)
+           .font('Helvetica');
+        
+        const startY = doc.y;
+        doc.text(`Estado: ${rule.status || 'N/A'}`, 70, startY);
+        
+        const fechaCreacion = rule.fecha_creacion 
+          ? new Date(rule.fecha_creacion).toLocaleDateString('es-MX') 
+          : 'N/A';
+        doc.text(`Creado: ${fechaCreacion}`, 70, startY + 15);
+        
+        let currentY = startY + 30;
+        
+        if (rule.input_usuario) {
+          const inputText = String(rule.input_usuario).length > 300 
+            ? String(rule.input_usuario).substring(0, 300) + '...'
+            : String(rule.input_usuario);
+          doc.text(`Input del Usuario: ${inputText}`, 70, currentY, { 
+            width: 450,
+            continued: false 
+          });
+          currentY = doc.y + 5;
+        }
+        
+        if (rule.resumen) {
+          const resumenText = String(rule.resumen).length > 300 
+            ? String(rule.resumen).substring(0, 300) + '...'
+            : String(rule.resumen);
+          doc.text(`Resumen AI: ${resumenText}`, 70, currentY, { 
+            width: 450,
+            continued: false 
+          });
+        }
+        
+        doc.moveDown(1.5);
+      });
+    } else {
+      doc.fontSize(12)
+         .font('Helvetica')
+         .text('No hay reglas disponibles en la base de datos.', 50, doc.y, { 
+           align: 'center', 
+           width: 495 
+         });
+    }
+    
+    // Add footer on each page
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.fontSize(8)
+         .font('Helvetica')
+         .text(`Reporte generado automáticamente - ${new Date().toLocaleString('es-MX')} - Página ${i + 1}`, 
+               50, 
+               doc.page.height - 30, 
+               { align: 'center', width: 495 });
+    }
+    
+    // Finalize the PDF - this triggers the 'end' event
+    doc.end();
+    
   } catch (error) {
     console.error('Error exporting PDF:', error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      message: error.message 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Error interno del servidor',
+        message: error.message 
+      });
+    }
   }
 });
 
