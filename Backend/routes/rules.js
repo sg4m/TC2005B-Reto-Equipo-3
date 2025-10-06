@@ -49,6 +49,7 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
 
     let aiResponse;
     let archivoPath = null;
+    let userInput = '';
 
     try {
       if (req.file) {
@@ -65,23 +66,38 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
             .on('error', reject);
         });
 
+        // Store user input (combination of text prompt and file info)
+        userInput = prompt_texto ? 
+          `${prompt_texto} (Archivo: ${req.file.originalname})` : 
+          `Análisis de datos del archivo: ${req.file.originalname}`;
+
         // Generate business rules from CSV data
         aiResponse = await geminiService.generateBusinessRulesFromData(csvData, prompt_texto || '');
         
       } else {
+        // Store user input (text prompt only)
+        userInput = prompt_texto;
+        
         // Generate business rules from text prompt only
         aiResponse = await geminiService.generateBusinessRulesFromPrompt(prompt_texto);
       }
 
-      // Insert into database with correct column names
+      // Generate AI summary from the complete business rules
+      const aiSummary = await geminiService.generateSummaryFromRules(aiResponse);
+
+      // Insert into database with new structure:
+      // - input_usuario: original user input
+      // - resumen: AI-generated summary  
+      // - regla_estandarizada: complete JSON structure
       const result = await db.query(
-        'INSERT INTO ReglaNegocio (id_usuario, status, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO reglanegocio (id_usuario, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [
           usuario_id,
           'Activa',
-          descripcion || prompt_texto || 'Regla generada por IA',
-          archivoPath,
-          JSON.stringify(aiResponse)
+          userInput,                    // User's original input
+          aiSummary,                    // AI-generated summary
+          archivoPath,                  // File path if applicable
+          JSON.stringify(aiResponse)    // Complete JSON structure
         ]
       );
 
@@ -95,19 +111,27 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
 
         // Update the database with the corrected rule IDs
         await db.query(
-          'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+          'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
           [JSON.stringify(aiResponse), dbId]
         );
       }
 
       res.status(201).json({
         message: 'Regla de negocio generada exitosamente con Gemini AI',
-        regla: result.rows[0],
+        regla: {
+          ...result.rows[0],
+          regla_estandarizada: aiResponse // Return parsed JSON instead of string
+        },
         ai_response: aiResponse
       });
 
     } catch (aiError) {
       console.error('Error with AI generation:', aiError);
+      
+      // Store user input even if AI fails
+      userInput = req.file ? 
+        `${prompt_texto || ''} (Archivo: ${req.file.originalname})`.trim() : 
+        (prompt_texto || 'Solicitud de regla de negocio');
       
       // If AI fails, still save the request but with error status
       const errorResponse = { 
@@ -120,17 +144,19 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
           actions: ["Reintentar generación"],
           priority: "high",
           category: "error"
-        }]
+        }],
+        summary: "Error en la generación de reglas de negocio"
       };
 
       const result = await db.query(
-        'INSERT INTO ReglaNegocio (id_usuario, status, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO reglanegocio (id_usuario, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [
           usuario_id,
           'Inactiva',
-          descripcion || prompt_texto || 'Regla con Error de IA',
-          archivoPath,
-          JSON.stringify(errorResponse)
+          userInput,                               // User's original input
+          'Error en generación de regla de IA',    // Error message as summary
+          archivoPath,                             // File path if applicable
+          JSON.stringify(errorResponse)            // Error response as JSON
         ]
       );
 
@@ -139,13 +165,16 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
       errorResponse.rules[0].id = `rule_${dbId}_error`;
       
       await db.query(
-        'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+        'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
         [JSON.stringify(errorResponse), dbId]
       );
 
       res.status(201).json({
         message: 'Regla guardada, pero hubo un error con la generación de IA',
-        regla: result.rows[0],
+        regla: {
+          ...result.rows[0],
+          regla_estandarizada: errorResponse
+        },
         error: aiError.message
       });
     }
@@ -162,7 +191,7 @@ router.get('/user/:id_usuario', async (req, res) => {
     const { id_usuario } = req.params;
     
     const result = await db.query(
-      'SELECT * FROM ReglaNegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC',
+      'SELECT * FROM reglanegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC',
       [id_usuario]
     );
 
@@ -183,7 +212,7 @@ router.get('/movements/:id_usuario', async (req, res) => {
     const { id_usuario } = req.params;
     
     const result = await db.query(
-      'SELECT id_regla, resumen, fecha_creacion, status FROM ReglaNegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC LIMIT 5',
+      'SELECT id_regla, resumen, fecha_creacion, status FROM reglanegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC LIMIT 5',
       [id_usuario]
     );
 
@@ -220,7 +249,7 @@ router.post('/:id/refine', async (req, res) => {
 
     // Get existing rule
     const existingRule = await db.query(
-      'SELECT * FROM ReglaNegocio WHERE id_regla = $1',
+      'SELECT * FROM reglanegocio WHERE id_regla = $1',
       [id]
     );
 
@@ -238,7 +267,7 @@ router.post('/:id/refine', async (req, res) => {
 
     // Update rule in database
     const result = await db.query(
-      'UPDATE ReglaNegocio SET regla_estandarizada = $1 WHERE id_regla = $2 RETURNING *',
+      'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2 RETURNING *',
       [JSON.stringify(refinedResponse), id]
     );
 
@@ -267,7 +296,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     const result = await db.query(
-      'UPDATE ReglaNegocio SET status = $1 WHERE id_regla = $2 RETURNING *',
+      'UPDATE reglanegocio SET status = $1 WHERE id_regla = $2 RETURNING *',
       [estado, id]
     );
 

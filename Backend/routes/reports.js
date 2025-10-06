@@ -8,32 +8,32 @@ router.get('/data', async (req, res) => {
     // Get rules statistics
     const activeRulesQuery = `
       SELECT COUNT(*) as count 
-      FROM reglas_negocio 
-      WHERE estado = 'activo'
+      FROM reglanegocio 
+      WHERE status = 'Activa'
     `;
     
     const inactiveRulesQuery = `
       SELECT COUNT(*) as count 
-      FROM reglas_negocio 
-      WHERE estado = 'inactivo'
+      FROM reglanegocio 
+      WHERE status = 'Inactiva'
     `;
     
     const simulationRulesQuery = `
       SELECT COUNT(*) as count 
-      FROM reglas_negocio 
-      WHERE estado = 'simulacion'
+      FROM reglanegocio 
+      WHERE status = 'Simulacion'
     `;
     
     // Get users statistics
     const totalUsersQuery = `
       SELECT COUNT(*) as count 
-      FROM usuarios
+      FROM usuario
     `;
     
     const activeUsersQuery = `
       SELECT COUNT(*) as count 
-      FROM usuarios 
-      WHERE ultimo_acceso > NOW() - INTERVAL '30 days'
+      FROM usuario 
+      WHERE fecha_registro > NOW() - INTERVAL '30 days'
     `;
     
     // Get most and least used rules
@@ -55,13 +55,13 @@ router.get('/data', async (req, res) => {
     
     // Get recent rule activity
     const lastCreatedRuleQuery = `
-      SELECT * FROM reglas_negocio 
+      SELECT * FROM reglanegocio 
       ORDER BY fecha_creacion DESC 
       LIMIT 1
     `;
     
     const lastModifiedRuleQuery = `
-      SELECT * FROM reglas_negocio 
+      SELECT * FROM reglanegocio 
       ORDER BY fecha_modificacion DESC 
       LIMIT 1
     `;
@@ -72,7 +72,7 @@ router.get('/data', async (req, res) => {
              COUNT(h.id) as total_executions,
              COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions,
              (COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) * 100.0 / COUNT(h.id)) as success_rate
-      FROM reglas_negocio r
+      FROM reglanegocio r
       LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
       GROUP BY r.id_regla
       HAVING COUNT(h.id) > 0
@@ -133,17 +133,17 @@ router.get('/rules-stats', async (req, res) => {
   try {
     const query = `
       SELECT 
-        estado,
+        status,
         COUNT(*) as count
-      FROM reglas_negocio 
-      GROUP BY estado
+      FROM reglanegocio 
+      GROUP BY status
     `;
     
     const result = await db.query(query);
     
     const stats = {};
     result.rows.forEach(row => {
-      stats[row.estado] = parseInt(row.count);
+      stats[row.status] = parseInt(row.count);
     });
 
     res.json(stats);
@@ -159,10 +159,10 @@ router.get('/rules-stats', async (req, res) => {
 // Get users statistics only
 router.get('/users-stats', async (req, res) => {
   try {
-    const totalUsersQuery = `SELECT COUNT(*) as count FROM usuarios`;
+    const totalUsersQuery = `SELECT COUNT(*) as count FROM usuario`;
     const activeUsersQuery = `
       SELECT COUNT(*) as count 
-      FROM usuarios 
+      FROM usuario 
       WHERE ultimo_acceso > NOW() - INTERVAL '30 days'
     `;
     
@@ -195,14 +195,14 @@ router.get('/export/csv', async (req, res) => {
         r.id_regla,
         r.nombre,
         r.descripcion,
-        r.estado,
+        r.status,
         r.fecha_creacion,
         r.fecha_modificacion,
         COUNT(h.id) as total_executions,
         COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
-      FROM reglas_negocio r
+      FROM reglanegocio r
       LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.estado, r.fecha_creacion, r.fecha_modificacion
+      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion
       ORDER BY r.fecha_creacion DESC
     `;
     
@@ -219,7 +219,7 @@ router.get('/export/csv', async (req, res) => {
         row.id_regla,
         `"${row.nombre || ''}"`,
         `"${row.descripcion || ''}"`,
-        row.estado,
+        row.status,
         row.fecha_creacion ? new Date(row.fecha_creacion).toISOString().split('T')[0] : '',
         row.fecha_modificacion ? new Date(row.fecha_modificacion).toISOString().split('T')[0] : '',
         row.total_executions || 0,
@@ -252,14 +252,14 @@ router.get('/export/pdf', async (req, res) => {
         r.id_regla,
         r.nombre,
         r.descripcion,
-        r.estado,
+        r.status,
         r.fecha_creacion,
         r.fecha_modificacion,
         COUNT(h.id) as total_executions,
         COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
-      FROM reglas_negocio r
+      FROM reglanegocio r
       LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.estado, r.fecha_creacion, r.fecha_modificacion
+      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion
       ORDER BY r.fecha_creacion DESC
     `;
     
@@ -299,13 +299,13 @@ router.post('/filtered', async (req, res) => {
         r.id_regla,
         r.nombre,
         r.descripcion,
-        r.estado,
+        r.status,
         r.fecha_creacion,
         r.fecha_modificacion,
         r.creado_por,
         COUNT(h.id) as total_executions,
         COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
-      FROM reglas_negocio r
+      FROM reglanegocio r
       LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
       WHERE 1=1
     `;
@@ -314,7 +314,7 @@ router.post('/filtered', async (req, res) => {
     let paramIndex = 1;
     
     if (estado) {
-      query += ` AND r.estado = $${paramIndex}`;
+      query += ` AND r.status = $${paramIndex}`;
       params.push(estado);
       paramIndex++;
     }
@@ -338,7 +338,7 @@ router.post('/filtered', async (req, res) => {
     }
     
     query += `
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.estado, r.fecha_creacion, r.fecha_modificacion, r.creado_por
+      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion, r.creado_por
       ORDER BY r.fecha_creacion DESC
     `;
     

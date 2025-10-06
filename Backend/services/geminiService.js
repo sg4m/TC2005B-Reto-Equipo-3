@@ -286,6 +286,54 @@ RESPONDE ÚNICAMENTE en español y mantén un tono profesional pero amigable.
     }
 
     /**
+     * Generate a concise summary from complete business rules JSON
+     * @param {Object} businessRulesJSON - Complete business rules structure
+     * @returns {Promise<string>} Concise summary of the rules
+     */
+    async generateSummaryFromRules(businessRulesJSON) {
+        try {
+            const systemPrompt = `
+Eres un experto en reglas de negocio para el banco Banorte. Genera un resumen conciso y claro de las reglas de negocio proporcionadas.
+
+Reglas Completas: ${JSON.stringify(businessRulesJSON, null, 2)}
+
+Crea un resumen que contenga ÚNICAMENTE la información más importante:
+- Tipo de reglas (fraude, cumplimiento, límites, etc.)
+- Criterios principales (montos, condiciones clave)
+- Acciones principales que se toman
+
+El resumen debe ser:
+- Máximo 2-3 oraciones
+- Claro y directo
+- Enfocado en los puntos más importantes
+- En español
+- Sin detalles técnicos innecesarios
+
+Ejemplo de formato esperado:
+"Reglas de gestión de riesgo para transacciones superiores a 10,000 MXN que incluyen verificación de fondos, detección de fraudes y notificaciones al cliente."
+
+Responde ÚNICAMENTE con el resumen, sin formato JSON ni texto adicional.
+`;
+
+            const result = await this.model.generateContent(systemPrompt);
+            const response = await result.response;
+            const text = response.text().trim();
+            
+            return text;
+
+        } catch (error) {
+            console.error('Error generando resumen de reglas:', error);
+            // Fallback summary if AI fails
+            if (businessRulesJSON && businessRulesJSON.rules && businessRulesJSON.rules.length > 0) {
+                const ruleCount = businessRulesJSON.rules.length;
+                const categories = [...new Set(businessRulesJSON.rules.map(rule => rule.category))];
+                return `Conjunto de ${ruleCount} regla(s) de negocio para ${categories.join(', ')}.`;
+            }
+            return 'Regla de negocio generada por IA.';
+        }
+    }
+
+    /**
      * Test the API connection and list available models
      * @returns {Promise<Object>} API status and available models
      */
