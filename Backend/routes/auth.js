@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
 
     // Check if user already exists
     const existingUser = await db.query(
-      'SELECT * FROM Usuario WHERE correo = $1 OR usuario = $2',
+      'SELECT * FROM usuario WHERE correo = $1 OR usuario = $2',
       [correo, usuario]
     );
 
@@ -33,7 +33,7 @@ router.post('/register', async (req, res) => {
 
     // Insert new user
     const result = await db.query(
-      'INSERT INTO Usuario (correo, usuario, contrasenia, pais_region) VALUES ($1, $2, $3, $4) RETURNING id_usuario, correo, usuario, pais_region, fecha_registro',
+      'INSERT INTO usuario (correo, usuario, contrasenia, pais_region) VALUES ($1, $2, $3, $4) RETURNING id_usuario, correo, usuario, pais_region, fecha_registro',
       [correo, usuario, hashedPassword, pais_region]
     );
 
@@ -64,7 +64,7 @@ router.post('/login', async (req, res) => {
 
     // Find user by username or email
     const result = await db.query(
-      'SELECT * FROM Usuario WHERE usuario = $1 OR correo = $1',
+      'SELECT * FROM usuario WHERE usuario = $1 OR correo = $1',
       [usuario]
     );
     console.log('User search result:', result.rows.length > 0 ? 'User found' : 'User not found');
@@ -114,7 +114,7 @@ router.post('/forgot-password', async (req, res) => {
   try {
     // Check if user exists with this email
     const userResult = await db.query(
-      'SELECT id_usuario, usuario FROM Usuario WHERE correo = $1',
+      'SELECT id_usuario, usuario FROM usuario WHERE correo = $1',
       [email]
     );
 
@@ -132,7 +132,7 @@ router.post('/forgot-password', async (req, res) => {
     
     // Update user's password in database
     await db.query(
-      'UPDATE Usuario SET contrasenia = $1 WHERE id_usuario = $2',
+      'UPDATE usuario SET contrasenia = $1 WHERE id_usuario = $2',
       [hashedTempPassword, user.id_usuario]
     );
     
@@ -169,7 +169,7 @@ router.post('/change-password', async (req, res) => {
   try {
     // Get user from database
     const userResult = await db.query(
-      'SELECT id_usuario, usuario, contrasenia FROM Usuario WHERE id_usuario = $1',
+      'SELECT id_usuario, usuario, contrasenia FROM usuario WHERE id_usuario = $1',
       [userId]
     );
 
@@ -194,10 +194,16 @@ router.post('/change-password', async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
     
     // Update user's password in database
-    await db.query(
-      'UPDATE Usuario SET contrasenia = $1 WHERE id_usuario = $2',
+    const updateResult = await db.query(
+      'UPDATE usuario SET contrasenia = $1 WHERE id_usuario = $2 RETURNING id_usuario',
       [hashedNewPassword, userId]
     );
+    
+    if (updateResult.rows.length === 0) {
+      return res.status(500).json({ 
+        error: 'No se pudo actualizar la contraseña' 
+      });
+    }
     
     console.log(`Password changed for user: ${user.usuario} (ID: ${userId})`);
     

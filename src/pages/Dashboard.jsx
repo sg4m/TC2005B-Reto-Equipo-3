@@ -4,7 +4,8 @@ import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import { Box, Typography, Button, IconButton, TextField, Drawer, List, ListItem, ListItemButton, ListItemText, useTheme,
 useMediaQuery, Popper, Paper, ClickAwayListener, Fade, Divider, Badge, Dialog, DialogTitle, DialogContent, DialogContentText, 
-DialogActions, FormControl, InputLabel, OutlinedInput, LinearProgress, Chip, Accordion, AccordionSummary, AccordionDetails
+DialogActions, FormControl, InputLabel, OutlinedInput, LinearProgress, Chip, Accordion, AccordionSummary, AccordionDetails,
+Card, CardContent
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -33,7 +34,6 @@ import {
   Schedule as ScheduleIcon,
   Badge as BadgeIcon,
   ChatBubbleOutline as ChatIcon,
-  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
 import { useBusinessRules } from '../hooks/useBusinessRules';
@@ -761,44 +761,52 @@ const Dashboard = () => {
             duration: theme.transitions.duration.leavingScreen,
           }),
           backgroundColor: '#f8f9fa',
-          padding: 2,
+          padding: 3,
           overflow: 'auto'
         }}
       >
+        {/* Dashboard Main Content */}
         <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', lg: '2.2fr 0.8fr' },
-          gap: 2,
-          height: 'calc(100vh - 100px)',
           width: '100%',
-          maxWidth: '1400px',
+          maxWidth: '1200px',
           margin: '0 auto'
         }}>
-          
-          {/* Left column - AI Business Rule Generator */}
+          {/* Header Section */}
           <Box sx={{ 
-            height: '100%', 
             display: 'flex', 
-            flexDirection: 'column',
-            backgroundColor: '#D3D3D3',
-            borderRadius: '16px',
-            p: 4
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            mb: 4,
+            flexWrap: 'wrap',
+            gap: 2
           }}>
-            <Typography 
-              variant="h6" 
-              component="h2" 
-              sx={{ 
-                textAlign: 'center',
-                mb: 3,
-                fontWeight: 600,
-                color: '#333',
-                fontSize: '18px'
-              }}
-            >
-              Generador de Reglas de Negocio - Gemini AI
-            </Typography>
+          </Box>
+
+          {/* Main Content Grid */}
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
+            gap: 3,
+            mb: 4
+          }}>
             
-            {/* AI Response Display Area */}
+            {/* AI Generator Card */}
+            <Card sx={{ 
+              backgroundColor: 'white',
+              border: '1px solid #e0e0e0',
+              borderRadius: '12px',
+              overflow: 'hidden'
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  color: '#333', 
+                  mb: 3
+                }}>
+                  Generador de Reglas de Negocio
+                </Typography>
+            
+                {/* AI Response Display Area */}
             <Box sx={{ 
               flex: 1, 
               backgroundColor: 'white',
@@ -1189,7 +1197,6 @@ const Dashboard = () => {
                 variant={!conversationMode ? "contained" : "outlined"}
                 onClick={() => !conversationMode || handleToggleConversationMode()}
                 disabled={isConversationActive}
-                startIcon={<AutoAwesomeIcon />}
                 sx={{ 
                   bgcolor: !conversationMode ? '#EB0029' : 'transparent',
                   borderColor: '#EB0029',
@@ -1228,8 +1235,9 @@ const Dashboard = () => {
 
             {/* Input and File Upload Area */}
             <Box sx={{ 
-              backgroundColor: '#D3D3D3',
+              backgroundColor: '#f8f9fa',
               borderRadius: '12px',
+              border: '1px solid #e0e0e0',
               p: 3
             }}>
               {!conversationMode && selectedFile ? (
@@ -1327,49 +1335,34 @@ const Dashboard = () => {
                 </Button>
               </Box>
             </Box>
-          </Box>
+              </CardContent>
+            </Card>
 
-          {/* Right column - Últimos movimientos */}
-          <Box sx={{ 
-            height: '100%',
-            backgroundColor: '#D3D3D3',
-            borderRadius: '16px',
-            p: 4,
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <Typography 
-              variant="h6" 
-              component="h2" 
-              sx={{ 
-                textAlign: 'center',
-                mb: 3,
-                fontWeight: 600,
-                color: '#333',
-                fontSize: '18px'
-              }}
-            >
-              Últimos Movimientos
-            </Typography>
-            
-            <Box sx={{ 
-              flex: 1,
+            {/* Right column - Últimos movimientos */}
+            <Card sx={{ 
               backgroundColor: 'white',
+              border: '1px solid #e0e0e0',
               borderRadius: '12px',
-              p: 3,
-              display: 'flex',
-              flexDirection: 'column'
+              overflow: 'hidden'
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Historial de Reglas
-                </Typography>
-                <IconButton size="small" onClick={loadMovements} disabled={isLoading}>
-                  <RefreshIcon />
-                </IconButton>
-              </Box>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#333',
+                      fontSize: '18px'
+                    }}
+                  >
+                    Últimos Movimientos
+                  </Typography>
+                  <IconButton size="small" onClick={loadMovements} disabled={isLoading}>
+                    <RefreshIcon />
+                  </IconButton>
+                </Box>
 
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                <Box sx={{ overflow: 'auto', maxHeight: '400px' }}>
                 {isLoading ? (
                   <Box sx={{ py: 4 }}>
                     <LinearProgress />
@@ -1406,8 +1399,9 @@ const Dashboard = () => {
                     </Typography>
                   </Box>
                 )}
-              </Box>
-            </Box>
+                </Box>
+              </CardContent>
+            </Card>
           </Box>
         </Box>
       </Box>
@@ -1778,6 +1772,11 @@ const Dashboard = () => {
                   }
                 }}
               />
+              {newPassword && newPassword.length < 8 && (
+                <Typography variant="caption" sx={{ color: '#f44336', fontSize: '11px', mt: 0.5 }}>
+                  La contraseña debe tener al menos 8 caracteres
+                </Typography>
+              )}
             </FormControl>
             
             <FormControl variant="outlined" fullWidth>
@@ -1795,15 +1794,56 @@ const Dashboard = () => {
                   }
                 }}
               />
+              {confirmPassword && newPassword && confirmPassword !== newPassword && (
+                <Typography variant="caption" sx={{ color: '#f44336', fontSize: '11px', mt: 0.5 }}>
+                  Las contraseñas no coinciden
+                </Typography>
+              )}
             </FormControl>
           </Box>
           
           <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-            <Typography variant="body2" sx={{ fontSize: '12px', color: '#666' }}>
+            <Typography variant="body2" sx={{ fontSize: '12px', color: '#666', mb: 1 }}>
               <strong>Requisitos de la contraseña:</strong>
-              <br />• Mínimo 8 caracteres
-              <br />• Diferente a tu contraseña actual
             </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontSize: '11px', 
+                  color: newPassword && newPassword.length >= 8 ? '#4caf50' : '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
+                }}
+              >
+                {newPassword && newPassword.length >= 8 ? '✓' : '•'} Mínimo 8 caracteres
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontSize: '11px', 
+                  color: newPassword && confirmPassword && newPassword === confirmPassword ? '#4caf50' : '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
+                }}
+              >
+                {newPassword && confirmPassword && newPassword === confirmPassword ? '✓' : '•'} Las contraseñas deben coincidir
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontSize: '11px', 
+                  color: newPassword && currentPassword && newPassword !== currentPassword ? '#4caf50' : '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
+                }}
+              >
+                {newPassword && currentPassword && newPassword !== currentPassword ? '✓' : '•'} Diferente a tu contraseña actual
+              </Typography>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 1 }}>
