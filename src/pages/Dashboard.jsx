@@ -695,13 +695,18 @@ const Dashboard = () => {
       }} />
       
       {/* Sidebar */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: desktopSidebarOpen ? drawerWidth : 0 }, flexShrink: { md: 0 } }}>
         <Drawer
-          variant={isMobile ? 'temporary' : 'permanent'}
+          variant="temporary"
           open={isMobile ? mobileOpen : desktopSidebarOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
             keepMounted: true,
+          }}
+          BackdropProps={{
+            sx: {
+              backgroundColor: isMobile ? 'rgba(0, 0, 0, 0.5)' : 'transparent',
+            }
           }}
           sx={{
             '& .MuiDrawer-paper': {

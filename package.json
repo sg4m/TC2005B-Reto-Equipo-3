@@ -8,10 +8,15 @@
     "dev:frontend": "vite",
     "dev:backend": "cd Backend && npm run dev",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "start:backend": "cd Backend && npm start",
-    "install:backend": "cd Backend && npm install"
+    "install:backend": "cd Backend && npm install",
+    "prepare:deploy": "npm run lint:fix && npm run build",
+    "test:build": "npm run build && npm run preview",
+    "clean": "rm -rf dist node_modules/.vite Backend/node_modules/.cache"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
