@@ -52,7 +52,9 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { usuario, contrasenia } = req.body;
-    console.log('Login attempt:', { usuario, contrasenia: '***' });
+    // Debugging: log raw body to detect missing fields or parsing issues
+    console.log('Login attempt (received body):', req.body);
+    console.log('Parsed fields:', { usuario, contrasenia: contrasenia ? '***' : contrasenia });
 
     // Validate required fields
     if (!usuario || !contrasenia) {

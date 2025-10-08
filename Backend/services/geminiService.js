@@ -60,7 +60,12 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
             // Try to parse JSON from the response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch (parseError) {
+                    console.warn('Warning: AI returned malformed JSON for simulateBusinessRule, falling back. Parse error:', parseError.message);
+                    // continue to fallback
+                }
             }
 
             // Fallback if JSON parsing fails
@@ -146,7 +151,12 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, análi
             // Try to parse JSON from the response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch (parseError) {
+                    console.warn('Warning: AI returned malformed JSON for generateBusinessRulesFromPrompt, falling back. Parse error:', parseError.message);
+                    // fallback
+                }
             }
 
             // Fallback response
@@ -202,7 +212,12 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
 
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch (parseError) {
+                    console.warn('Warning: AI returned malformed JSON for generateBusinessRulesFromData, falling back. Parse error:', parseError.message);
+                    // fallback
+                }
             }
 
             return existingRules; // Return original if parsing fails

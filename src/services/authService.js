@@ -17,9 +17,9 @@ class AuthService {
         contrasenia: '***',
         pais_region: userData.country 
       });
-      console.log('🌐 API URL:', `${this.baseURL}/auth/register`);
+  console.log('🌐 API URL:', `${this.baseURL}/auth/register`);
       
-      const response = await fetch(`${this.baseURL}/register`, {
+  const response = await fetch(`${this.baseURL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,15 +60,15 @@ class AuthService {
   async login(credentials) {
     try {
       console.log('🔐 Frontend login attempt:', { usuario: credentials.usuario, contrasenia: '***' });
-      console.log('🌐 API URL:', `${this.baseURL}/auth/login`);
+  console.log('🌐 API URL:', `${this.baseURL}/auth/login`);
       
-      const response = await fetch(`${this.baseURL}/login`, {
+      const response = await fetch(`${this.baseURL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          correo: credentials.usuario, // Can be username or email
+          usuario: credentials.usuario, // send as 'usuario' so backend req.body.usuario is populated
           contrasenia: credentials.contrasenia
         }),
       });
@@ -143,9 +143,9 @@ class AuthService {
       }
 
       console.log('🔐 Frontend change password attempt for user:', currentUser.id);
-      console.log('🌐 API URL:', `${this.baseURL}/auth/change-password`);
+  console.log('🌐 API URL:', `${this.baseURL}/auth/change-password`);
       
-      const response = await fetch(`${this.baseURL}/auth/change-password`, {
+  const response = await fetch(`${this.baseURL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

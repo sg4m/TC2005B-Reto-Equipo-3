@@ -69,6 +69,21 @@ router.post('/text', async (req, res) => {
 
     const rule = ruleResult.rows[0];
 
+    // Normalize test_data: allow either plain text or JSON input
+    let parsedTestData = test_data;
+    if (typeof test_data === 'string') {
+      const trimmed = test_data.trim();
+      // Heuristic: if it looks like JSON (starts with { or [), try parse
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          parsedTestData = JSON.parse(trimmed);
+        } catch (e) {
+          // Not valid JSON, keep as plain text
+          parsedTestData = test_data;
+        }
+      }
+    }
+
     // Prepare simulation context for Gemini AI
     const simulationContext = {
       rule: {
@@ -77,7 +92,7 @@ router.post('/text', async (req, res) => {
         status: rule.status,
         details: rule.regla_estandarizada
       },
-      testData: test_data,
+      testData: parsedTestData,
       inputType: 'text'
     };
 
@@ -90,7 +105,8 @@ router.post('/text', async (req, res) => {
       [
         rule_id,
         'text',
-        test_data,
+        // Store as JSON text if parsedTestData is an object/array, otherwise store raw string
+        typeof parsedTestData === 'string' ? parsedTestData : JSON.stringify(parsedTestData),
         JSON.stringify(aiResponse)
       ]
     );
