@@ -6,20 +6,26 @@ const PDFDocument = require('pdfkit');
 // Get comprehensive reports data
 router.get('/data', async (req, res) => {
   try {
+    const { user_id } = req.query;
     // Get rules statistics
     const activeRulesQuery = `
       SELECT COUNT(*) as count 
       FROM reglanegocio 
-      WHERE status = 'Activa'
+      ${user_id ? "WHERE usuario_id = $1 AND status = 'Activa'" : "WHERE status = 'Activa'"}
     `;
     
     const inactiveRulesQuery = `
       SELECT COUNT(*) as count 
       FROM reglanegocio 
-      WHERE status = 'Inactiva'
+      ${user_id ? "WHERE usuario_id = $1 AND status = 'Inactiva'" : "WHERE status = 'Inactiva'"}
     `;
     
-    const simulationRulesQuery = `
+    const simulationRulesQuery = user_id ? `
+      SELECT COUNT(DISTINCT s.regla_id) as count
+      FROM simulacion_reglas s
+      INNER JOIN reglanegocio r ON s.regla_id = r.id
+      WHERE r.usuario_id = $1
+    ` : `
       SELECT COUNT(DISTINCT regla_id) as count 
       FROM simulacion_reglas
     `;
@@ -28,7 +34,7 @@ router.get('/data', async (req, res) => {
     const totalUsersQuery = `
       SELECT COUNT(*) as count 
       FROM usuario
-    `;
+    `; // users stats remain global
     
     const activeUsersQuery = `
       SELECT COUNT(*) as count 
@@ -54,31 +60,40 @@ router.get('/data', async (req, res) => {
     `;
     
     // Get recent rule activity
-    const lastCreatedRuleQuery = `
-      SELECT * FROM reglanegocio 
-      ORDER BY fecha_creacion DESC 
-      LIMIT 1
+    const lastCreatedRuleQuery = user_id ? `
+      SELECT * FROM reglanegocio WHERE usuario_id = $1
+      ORDER BY fecha_creacion DESC LIMIT 1
+    ` : `
+      SELECT * FROM reglanegocio ORDER BY fecha_creacion DESC LIMIT 1
     `;
     
-    const lastModifiedRuleQuery = `
-      SELECT * FROM reglanegocio 
-      ORDER BY fecha_actualizacion DESC 
-      LIMIT 1
+    const lastModifiedRuleQuery = user_id ? `
+      SELECT * FROM reglanegocio WHERE usuario_id = $1
+      ORDER BY fecha_actualizacion DESC LIMIT 1
+    ` : `
+      SELECT * FROM reglanegocio ORDER BY fecha_actualizacion DESC LIMIT 1
     `;
     
     // Get most successful rule (most simulated)
-    const mostSuccessfulRuleQuery = `
-      SELECT r.*, 
-             COUNT(s.id) as total_simulations
+    const mostSuccessfulRuleQuery = user_id ? `
+      SELECT r.*, COUNT(s.id) as total_simulations
+      FROM reglanegocio r
+      LEFT JOIN simulacion_reglas s ON r.id = s.regla_id
+      WHERE r.usuario_id = $1
+      GROUP BY r.id
+      HAVING COUNT(s.id) > 0
+      ORDER BY total_simulations DESC LIMIT 1
+    ` : `
+      SELECT r.*, COUNT(s.id) as total_simulations
       FROM reglanegocio r
       LEFT JOIN simulacion_reglas s ON r.id = s.regla_id
       GROUP BY r.id
       HAVING COUNT(s.id) > 0
-      ORDER BY total_simulations DESC
-      LIMIT 1
+      ORDER BY total_simulations DESC LIMIT 1
     `;
 
     // Execute all queries
+    const params = user_id ? [user_id] : [];
     const [
       activeRulesResult,
       inactiveRulesResult, 
@@ -91,16 +106,16 @@ router.get('/data', async (req, res) => {
       lastModifiedRuleResult,
       mostSuccessfulRuleResult
     ] = await Promise.all([
-      db.query(activeRulesQuery),
-      db.query(inactiveRulesQuery),
-      db.query(simulationRulesQuery),
+      db.query(activeRulesQuery, params),
+      db.query(inactiveRulesQuery, params),
+      db.query(simulationRulesQuery, params),
       db.query(totalUsersQuery),
       db.query(activeUsersQuery),
       db.query(mostUsedRuleQuery),
       db.query(leastUsedRuleQuery),
-      db.query(lastCreatedRuleQuery),
-      db.query(lastModifiedRuleQuery),
-      db.query(mostSuccessfulRuleQuery)
+      db.query(lastCreatedRuleQuery, params),
+      db.query(lastModifiedRuleQuery, params),
+      db.query(mostSuccessfulRuleQuery, params)
     ]);
 
     const reportsData = {
@@ -129,15 +144,14 @@ router.get('/data', async (req, res) => {
 // Get rules statistics only
 router.get('/rules-stats', async (req, res) => {
   try {
+    const { user_id } = req.query;
     const query = `
-      SELECT 
-        status,
-        COUNT(*) as count
-      FROM reglanegocio 
+      SELECT status, COUNT(*) as count
+      FROM reglanegocio
+      ${user_id ? 'WHERE usuario_id = $1' : ''}
       GROUP BY status
     `;
-    
-    const result = await db.query(query);
+    const result = user_id ? await db.query(query, [user_id]) : await db.query(query);
     
     const stats = {};
     result.rows.forEach(row => {
@@ -186,6 +200,7 @@ router.get('/users-stats', async (req, res) => {
 // Get simulation statistics - count of unique business rules that have simulations
 router.get('/simulation-stats', async (req, res) => {
   try {
+    const { user_id } = req.query;
     const simulationStatsQuery = `
       SELECT 
         COUNT(DISTINCT s.regla_id) as rules_with_simulations,
@@ -194,9 +209,9 @@ router.get('/simulation-stats', async (req, res) => {
         COUNT(CASE WHEN s.tipo_entrada = 'file' THEN 1 END) as file_simulations
       FROM simulacion_reglas s
       INNER JOIN reglanegocio r ON s.regla_id = r.id
+      ${user_id ? 'WHERE r.usuario_id = $1' : ''}
     `;
-    
-    const result = await db.query(simulationStatsQuery);
+    const result = user_id ? await db.query(simulationStatsQuery, [user_id]) : await db.query(simulationStatsQuery);
     const row = result.rows[0];
 
     const stats = {
@@ -220,7 +235,34 @@ router.get('/simulation-stats', async (req, res) => {
 router.get('/export/csv', async (req, res) => {
   try {
     // Get comprehensive data for CSV export including simulation statistics
-    const rulesQuery = `
+    const { user_id } = req.query;
+    const rulesQuery = user_id ? `
+      SELECT 
+        r.id,
+        r.status,
+        r.fecha_creacion,
+        r.input_usuario,
+        r.resumen,
+        r.archivo_original,
+        r.regla_estandarizada,
+        COALESCE(s.total_simulations, 0) as total_simulaciones,
+        COALESCE(s.text_simulations, 0) as simulaciones_texto,
+        COALESCE(s.file_simulations, 0) as simulaciones_archivo,
+        s.last_simulation_date as ultima_simulacion
+      FROM reglanegocio r
+      LEFT JOIN (
+        SELECT 
+          regla_id,
+          COUNT(*) as total_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
+          MAX(fecha_simulacion) as last_simulation_date
+        FROM simulacion_reglas 
+        GROUP BY regla_id
+      ) s ON r.id = s.regla_id
+      WHERE r.usuario_id = $1
+      ORDER BY r.fecha_creacion DESC
+    ` : `
       SELECT 
         r.id,
         r.status,
@@ -247,7 +289,8 @@ router.get('/export/csv', async (req, res) => {
       ORDER BY r.fecha_creacion DESC
     `;
     
-    const result = await db.query(rulesQuery);
+  const params = user_id ? [user_id] : [];
+  const result = await db.query(rulesQuery, params);
     
     // Create CSV content with simulation data
     const csvHeader = 'ID Regla,Estado,Fecha Creacion,Input Usuario,Resumen,Archivo Original,Regla Estandarizada,Total Simulaciones,Simulaciones Texto,Simulaciones Archivo,Ultima Simulacion\n';
@@ -286,7 +329,33 @@ router.get('/export/csv', async (req, res) => {
 // Export reports data as PDF using PDFKit
 router.get('/export/pdf', async (req, res) => {
   try {
-    const dataQuery = `
+    const dataUserId = req.query.user_id;
+    const dataQuery = dataUserId ? `
+      SELECT 
+        r.id,
+        r.status,
+        r.fecha_creacion,
+        r.input_usuario,
+        r.resumen,
+        r.regla_estandarizada,
+        COALESCE(s.total_simulations, 0) as total_simulaciones,
+        COALESCE(s.text_simulations, 0) as simulaciones_texto,
+        COALESCE(s.file_simulations, 0) as simulaciones_archivo,
+        s.last_simulation_date as ultima_simulacion
+      FROM reglanegocio r
+      LEFT JOIN (
+        SELECT 
+          regla_id,
+          COUNT(*) as total_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
+          MAX(fecha_simulacion) as last_simulation_date
+        FROM simulacion_reglas 
+        GROUP BY regla_id
+      ) s ON r.id = s.regla_id
+      WHERE r.usuario_id = $1
+      ORDER BY r.fecha_creacion DESC
+    ` : `
       SELECT 
         r.id,
         r.status,
@@ -311,8 +380,9 @@ router.get('/export/pdf', async (req, res) => {
       ) s ON r.id = s.regla_id
       ORDER BY r.fecha_creacion DESC
     `;
+    const dataParams = dataUserId ? [dataUserId] : [];
     
-    const result = await db.query(dataQuery);
+    const result = await db.query(dataQuery, dataParams);
     
     // Set response headers before creating the document
     const filename = `reporte-reglas-simulaciones-${new Date().toISOString().split('T')[0]}.pdf`;
@@ -469,6 +539,28 @@ router.get('/export/pdf', async (req, res) => {
         message: error.message 
       });
     }
+  }
+});
+
+// Get all rules details (optionally filtered by user)
+router.get('/rules-details', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    const query = user_id ? `SELECT * FROM reglanegocio WHERE usuario_id = $1 ORDER BY fecha_creacion DESC` : `SELECT * FROM reglanegocio ORDER BY fecha_creacion DESC`;
+    const result = user_id ? await db.query(query, [user_id]) : await db.query(query);
+
+    const formatted = result.rows.map(r => ({
+      id_regla: r.id,
+      status: r.status,
+      fecha_creacion: r.fecha_creacion,
+      descripcion: r.resumen || r.input_usuario,
+      regla_estandarizada: r.regla_estandarizada
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching rules details:', error);
+    res.status(500).json({ error: 'Error interno del servidor', message: error.message });
   }
 });
 

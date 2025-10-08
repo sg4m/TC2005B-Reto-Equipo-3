@@ -25,11 +25,11 @@ const handleNetworkError = (error) => {
 
 class ReportsService {
   // Get comprehensive reports data from backend
-  async getReportsData() {
+  async getReportsData(userId = null) {
     try {
       // Fetch data from working endpoints only
       const [rulesStats, usersStats, simulationStats, dashboard] = await Promise.all([
-        this.getRulesStats().catch(err => {
+        this.getRulesStats(userId).catch(err => {
           console.warn('Rules stats failed:', err);
           return {};
         }),
@@ -37,11 +37,11 @@ class ReportsService {
           console.warn('Users stats failed:', err);
           return {};
         }),
-        this.getSimulationStats().catch(err => {
+        this.getSimulationStats(userId).catch(err => {
           console.warn('Simulation stats failed:', err);
           return {};
         }),
-        this.getDashboardData().catch(err => {
+        this.getDashboardData(userId).catch(err => {
           console.warn('Dashboard data failed:', err);
           return {};
         })
@@ -80,9 +80,10 @@ class ReportsService {
   }
 
   // Get rules statistics from backend
-  async getRulesStats() {
+  async getRulesStats(userId = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/rules-stats`, {
+      const url = userId ? `${API_BASE_URL}/reports/rules-stats?user_id=${encodeURIComponent(userId)}` : `${API_BASE_URL}/reports/rules-stats`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -112,9 +113,10 @@ class ReportsService {
   }
 
   // Get simulation statistics from backend
-  async getSimulationStats() {
+  async getSimulationStats(userId = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/simulation-stats`, {
+      const url = userId ? `${API_BASE_URL}/reports/simulation-stats?user_id=${encodeURIComponent(userId)}` : `${API_BASE_URL}/reports/simulation-stats`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +130,7 @@ class ReportsService {
   }
 
   // Get dashboard data (recent activity, most successful rule)
-  async getDashboardData() {
+  async getDashboardData(userId = null) {
     try {
       // For now, since we don't have historial_reglas table, we'll return basic placeholder data
       // This can be enhanced once the database schema includes execution history
@@ -171,7 +173,9 @@ class ReportsService {
   // Export data as PDF from backend
   async exportToPDF() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/export/pdf`, {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userIdQuery = currentUser?.id ? `?user_id=${encodeURIComponent(currentUser.id)}` : '';
+      const response = await fetch(`${API_BASE_URL}/reports/export/pdf${userIdQuery}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
@@ -201,7 +205,9 @@ class ReportsService {
   // Export data as CSV from backend  
   async exportToCSV() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/export/csv`, {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userIdQuery = currentUser?.id ? `?user_id=${encodeURIComponent(currentUser.id)}` : '';
+      const response = await fetch(`${API_BASE_URL}/reports/export/csv${userIdQuery}`, {
         method: 'GET',
       });
       
@@ -264,9 +270,10 @@ class ReportsService {
   }
 
   // Get all rules with detailed information
-  async getAllRulesDetails() {
+  async getAllRulesDetails(userId = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/rules-details`, {
+      const url = userId ? `${API_BASE_URL}/reports/rules-details?user_id=${encodeURIComponent(userId)}` : `${API_BASE_URL}/reports/rules-details`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

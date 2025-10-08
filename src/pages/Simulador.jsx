@@ -110,7 +110,9 @@ const Simulador = () => {
     setRulesLoading(true);
     setRulesError(null);
     try {
-      const rules = await rulesService.getAllRules();
+      const currentUser = authService.getCurrentUser?.();
+      const userId = currentUser?.id || null;
+      const rules = await rulesService.getAllRules(userId);
       setBusinessRules(rules || []);
     } catch (error) {
       console.error('Error loading rules:', error);

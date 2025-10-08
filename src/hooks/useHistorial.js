@@ -13,8 +13,9 @@ export const useHistorial = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const data = await historialService.getHistorialData();
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = currentUser?.id || null;
+      const data = await historialService.getHistorialData(userId);
       setHistorialData(data);
       setFilteredData(data);
     } catch (err) {
@@ -33,8 +34,9 @@ export const useHistorial = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const data = await historialService.getFilteredHistorial(searchTerm, filterBy);
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = currentUser?.id || null;
+      const data = await historialService.getFilteredHistorial(searchTerm, filterBy, userId);
       setFilteredData(data);
     } catch (err) {
       console.error('Error fetching filtered historial data:', err);

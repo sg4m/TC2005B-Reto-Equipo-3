@@ -5,7 +5,9 @@ const db = require('../config/database');
 // Get all historial data for the Historial page
 router.get('/', async (req, res) => {
   try {
-    const query = `
+    // Support optional user filter: /api/historial?user_id=123
+    const { user_id } = req.query;
+    let query = `
       SELECT 
         id,
         status,
@@ -13,10 +15,15 @@ router.get('/', async (req, res) => {
         input_usuario,
         resumen
       FROM reglanegocio
-      ORDER BY fecha_creacion DESC
     `;
-    
-    const result = await db.query(query);
+    const params = [];
+    if (user_id) {
+      query += ` WHERE usuario_id = $1 `;
+      params.push(user_id);
+    }
+    query += ` ORDER BY fecha_creacion DESC `;
+
+    const result = await db.query(query, params);
     
     // Format data for frontend consumption
     const historialData = result.rows.map(row => ({
@@ -40,7 +47,7 @@ router.get('/', async (req, res) => {
 // Get filtered historial data
 router.post('/filtered', async (req, res) => {
   try {
-    const { searchTerm, filterBy } = req.body;
+    const { searchTerm, filterBy, user_id } = req.body;
     
     let query = `
       SELECT 
@@ -55,6 +62,12 @@ router.post('/filtered', async (req, res) => {
     
     const params = [];
     let paramIndex = 1;
+    // If user_id provided, restrict to that user's records
+    if (user_id) {
+      query += ` AND usuario_id = $${paramIndex}`;
+      params.push(user_id);
+      paramIndex++;
+    }
     
     // Apply search filters
     if (searchTerm && searchTerm.trim() !== '') {
@@ -116,7 +129,9 @@ router.post('/filtered', async (req, res) => {
 // Get historial statistics
 router.get('/stats', async (req, res) => {
   try {
-    const statsQuery = `
+    // Support optional user filter via query param: /stats?user_id=123
+    const { user_id } = req.query;
+    let statsQuery = `
       SELECT 
         COUNT(*) as total_rules,
         COUNT(CASE WHEN status = 'Activa' THEN 1 END) as active_rules,
@@ -125,8 +140,14 @@ router.get('/stats', async (req, res) => {
         COUNT(CASE WHEN fecha_creacion > NOW() - INTERVAL '7 days' THEN 1 END) as recent_rules
       FROM reglanegocio
     `;
-    
-    const result = await db.query(statsQuery);
+
+    const params = [];
+    if (user_id) {
+      statsQuery = statsQuery.replace(/FROM reglanegocio/, 'FROM reglanegocio WHERE usuario_id = $1');
+      params.push(user_id);
+    }
+
+    const result = await db.query(statsQuery, params);
     const stats = result.rows[0];
 
     res.json({

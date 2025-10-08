@@ -320,9 +320,12 @@ router.patch('/:id/status', async (req, res) => {
 // Get all rules for the Reglas management page
 router.get('/list', async (req, res) => {
   try {
-    const query = `
+    // Allow optional filtering by user: /list?user_id=123
+    const { user_id } = req.query;
+    let query = `
       SELECT 
         id,
+        usuario_id,
         status,
         fecha_creacion,
         input_usuario,
@@ -330,10 +333,15 @@ router.get('/list', async (req, res) => {
         archivo_original,
         regla_estandarizada
       FROM reglanegocio
-      ORDER BY fecha_creacion DESC
     `;
-    
-    const result = await db.query(query);
+    const params = [];
+    if (user_id) {
+      query += ` WHERE usuario_id = $1 `;
+      params.push(user_id);
+    }
+    query += ` ORDER BY fecha_creacion DESC `;
+
+    const result = await db.query(query, params);
     
     // Format data for frontend consumption
     const rulesData = result.rows.map(row => {

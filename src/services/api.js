@@ -143,10 +143,11 @@ export const rulesService = {
     }
   },
 
-  // Get all business rules for management
-  async getAllRules() {
+  // Get all business rules for management (optional: filter by userId)
+  async getAllRules(userId = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/rules/list`, {
+      const url = userId ? `${API_BASE_URL}/rules/list?user_id=${encodeURIComponent(userId)}` : `${API_BASE_URL}/rules/list`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -28,7 +28,9 @@ class HistorialService {
   // Get all historial data
   async getHistorialData() {
     try {
-      const response = await fetch(`${API_BASE_URL}/historial`, {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userIdQuery = currentUser?.id ? `?user_id=${encodeURIComponent(currentUser.id)}` : '';
+      const response = await fetch(`${API_BASE_URL}/historial${userIdQuery}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -44,15 +46,16 @@ class HistorialService {
   // Get filtered historial data
   async getFilteredHistorial(searchTerm = '', filterBy = 'all') {
     try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = currentUser?.id || null;
+      const body = { searchTerm, filterBy };
+      if (userId) body.user_id = userId;
       const response = await fetch(`${API_BASE_URL}/historial/filtered`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          searchTerm,
-          filterBy
-        }),
+        body: JSON.stringify(body),
       });
       return await handleResponse(response);
     } catch (error) {
@@ -64,7 +67,9 @@ class HistorialService {
   // Get historial statistics
   async getHistorialStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/historial/stats`, {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userIdQuery = currentUser?.id ? `?user_id=${encodeURIComponent(currentUser.id)}` : '';
+      const response = await fetch(`${API_BASE_URL}/historial/stats${userIdQuery}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

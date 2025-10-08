@@ -12,8 +12,9 @@ export const useReports = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const data = await reportsService.getReportsData();
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = currentUser?.id || null;
+      const data = await reportsService.getReportsData(userId);
       setReportsData(data);
     } catch (err) {
       console.error('Error fetching reports data:', err);
