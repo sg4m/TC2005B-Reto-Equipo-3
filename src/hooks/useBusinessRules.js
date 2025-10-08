@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { rulesService } from '../services/api';
 
 export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
@@ -8,6 +8,8 @@ export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
   const [aiResponse, setAiResponse] = useState(null);
   const [error, setError] = useState(null);
   const [movements, setMovements] = useState([]);
+  const [businessRules, setBusinessRules] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Generate new business rule
   const generateRule = useCallback(async (data) => {
@@ -105,6 +107,45 @@ export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
     }
   }, [currentRule, loadMovements]);
 
+  // Get all business rules for management
+  const getAllBusinessRules = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await rulesService.getAllRules();
+      setBusinessRules(result || []);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      setBusinessRules([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refresh all rules (alias for better naming)
+  const refreshRules = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await rulesService.getAllRules();
+      setBusinessRules(result || []);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      setBusinessRules([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // No dependencies to prevent infinite loops
+
+  // Auto-load business rules on hook initialization
+  useEffect(() => {
+    refreshRules();
+  }, []); // Empty dependency array - only run once on mount
+
   // Clear current state
   const clearState = useCallback(() => {
     setCurrentRule(null);
@@ -120,12 +161,16 @@ export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
     aiResponse,
     error,
     movements,
+    businessRules,
+    loading,
     
     // Actions
     generateRule,
     loadMovements,
     refineRule,
     updateRuleStatus,
+    getAllBusinessRules,
+    refreshRules,
     clearState,
   };
 };

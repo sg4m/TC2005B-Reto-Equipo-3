@@ -28,13 +28,17 @@ class ReportsService {
   async getReportsData() {
     try {
       // Fetch data from working endpoints only
-      const [rulesStats, usersStats, dashboard] = await Promise.all([
+      const [rulesStats, usersStats, simulationStats, dashboard] = await Promise.all([
         this.getRulesStats().catch(err => {
           console.warn('Rules stats failed:', err);
           return {};
         }),
         this.getUsersStats().catch(err => {
           console.warn('Users stats failed:', err);
+          return {};
+        }),
+        this.getSimulationStats().catch(err => {
+          console.warn('Simulation stats failed:', err);
           return {};
         }),
         this.getDashboardData().catch(err => {
@@ -48,11 +52,16 @@ class ReportsService {
         // Rules statistics - map the correct field names from backend
         activeRules: rulesStats.Activa || 0,
         inactiveRules: rulesStats.Inactiva || 0,
-        simulationRules: rulesStats.Simulacion || 0,
+        simulationRules: simulationStats.rulesWithSimulations || 0, // Use actual simulation count from DB
         
         // Users statistics
         totalUsers: usersStats.totalUsers || 0,
         activeUsers: usersStats.activeUsers || 0,
+        
+        // Simulation detailed statistics
+        totalSimulations: simulationStats.totalSimulations || 0,
+        textSimulations: simulationStats.textSimulations || 0,
+        fileSimulations: simulationStats.fileSimulations || 0,
         
         // Recent activity data
         recentActivity: dashboard.recentActivity || null,
@@ -98,6 +107,22 @@ class ReportsService {
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching users stats:', error);
+      handleNetworkError(error);
+    }
+  }
+
+  // Get simulation statistics from backend
+  async getSimulationStats() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/simulation-stats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching simulation stats:', error);
       handleNetworkError(error);
     }
   }

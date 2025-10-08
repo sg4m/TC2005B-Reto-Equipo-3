@@ -20,9 +20,8 @@ router.get('/data', async (req, res) => {
     `;
     
     const simulationRulesQuery = `
-      SELECT COUNT(*) as count 
-      FROM reglanegocio 
-      WHERE status = 'Simulacion'
+      SELECT COUNT(DISTINCT id_regla) as count 
+      FROM simulacion_reglas
     `;
     
     // Get users statistics
@@ -186,29 +185,77 @@ router.get('/users-stats', async (req, res) => {
   }
 });
 
+// Get simulation statistics - count of unique business rules that have simulations
+router.get('/simulation-stats', async (req, res) => {
+  try {
+    const simulationStatsQuery = `
+      SELECT 
+        COUNT(DISTINCT s.id_regla) as rules_with_simulations,
+        COUNT(s.id_simulacion) as total_simulations,
+        COUNT(CASE WHEN s.tipo_entrada = 'text' THEN 1 END) as text_simulations,
+        COUNT(CASE WHEN s.tipo_entrada = 'file' THEN 1 END) as file_simulations
+      FROM simulacion_reglas s
+      INNER JOIN reglanegocio r ON s.id_regla = r.id_regla
+    `;
+    
+    const result = await db.query(simulationStatsQuery);
+    const row = result.rows[0];
+
+    const stats = {
+      rulesWithSimulations: parseInt(row?.rules_with_simulations || 0),
+      totalSimulations: parseInt(row?.total_simulations || 0),
+      textSimulations: parseInt(row?.text_simulations || 0),
+      fileSimulations: parseInt(row?.file_simulations || 0)
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching simulation statistics:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
 // Export reports data as CSV
 router.get('/export/csv', async (req, res) => {
   try {
-    // Get comprehensive data for CSV export (using only existing columns)
+    // Get comprehensive data for CSV export including simulation statistics
     const rulesQuery = `
       SELECT 
-        id_regla,
-        status,
-        fecha_creacion,
-        input_usuario,
-        resumen,
-        archivo_original,
-        regla_estandarizada
-      FROM reglanegocio
-      ORDER BY fecha_creacion DESC
+        r.id_regla,
+        r.status,
+        r.fecha_creacion,
+        r.input_usuario,
+        r.resumen,
+        r.archivo_original,
+        r.regla_estandarizada,
+        COALESCE(s.total_simulations, 0) as total_simulaciones,
+        COALESCE(s.text_simulations, 0) as simulaciones_texto,
+        COALESCE(s.file_simulations, 0) as simulaciones_archivo,
+        s.last_simulation_date as ultima_simulacion
+      FROM reglanegocio r
+      LEFT JOIN (
+        SELECT 
+          id_regla,
+          COUNT(*) as total_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
+          MAX(fecha_simulacion) as last_simulation_date
+        FROM simulacion_reglas 
+        GROUP BY id_regla
+      ) s ON r.id_regla = s.id_regla
+      ORDER BY r.fecha_creacion DESC
     `;
     
     const result = await db.query(rulesQuery);
     
-    // Create CSV content
-    const csvHeader = 'ID Regla,Estado,Fecha Creacion,Input Usuario,Resumen,Archivo Original,Regla Estandarizada\n';
+    // Create CSV content with simulation data
+    const csvHeader = 'ID Regla,Estado,Fecha Creacion,Input Usuario,Resumen,Archivo Original,Regla Estandarizada,Total Simulaciones,Simulaciones Texto,Simulaciones Archivo,Ultima Simulacion\n';
     const csvContent = result.rows.map(row => {
       const reglaEstandarizada = row.regla_estandarizada ? String(row.regla_estandarizada).substring(0, 100) : '';
+      const ultimaSimulacion = row.ultima_simulacion ? new Date(row.ultima_simulacion).toISOString().split('T')[0] : 'N/A';
       return [
         row.id_regla || '',
         row.status || '',
@@ -216,14 +263,18 @@ router.get('/export/csv', async (req, res) => {
         `"${(row.input_usuario || '').replace(/"/g, '""')}"`,
         `"${(row.resumen || '').replace(/"/g, '""')}"`,
         `"${(row.archivo_original || '').replace(/"/g, '""')}"`,
-        `"${reglaEstandarizada.replace(/"/g, '""')}..."`
+        `"${reglaEstandarizada.replace(/"/g, '""')}..."`,
+        row.total_simulaciones || 0,
+        row.simulaciones_texto || 0,
+        row.simulaciones_archivo || 0,
+        ultimaSimulacion
       ].join(',');
     }).join('\n');
 
     const csv = csvHeader + csvContent;
     
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="reporte-reglas-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="reporte-reglas-simulaciones-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
   } catch (error) {
     console.error('Error exporting CSV:', error);
@@ -239,20 +290,34 @@ router.get('/export/pdf', async (req, res) => {
   try {
     const dataQuery = `
       SELECT 
-        id_regla,
-        status,
-        fecha_creacion,
-        input_usuario,
-        resumen,
-        regla_estandarizada
-      FROM reglanegocio
-      ORDER BY fecha_creacion DESC
+        r.id_regla,
+        r.status,
+        r.fecha_creacion,
+        r.input_usuario,
+        r.resumen,
+        r.regla_estandarizada,
+        COALESCE(s.total_simulations, 0) as total_simulaciones,
+        COALESCE(s.text_simulations, 0) as simulaciones_texto,
+        COALESCE(s.file_simulations, 0) as simulaciones_archivo,
+        s.last_simulation_date as ultima_simulacion
+      FROM reglanegocio r
+      LEFT JOIN (
+        SELECT 
+          id_regla,
+          COUNT(*) as total_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
+          COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
+          MAX(fecha_simulacion) as last_simulation_date
+        FROM simulacion_reglas 
+        GROUP BY id_regla
+      ) s ON r.id_regla = s.id_regla
+      ORDER BY r.fecha_creacion DESC
     `;
     
     const result = await db.query(dataQuery);
     
     // Set response headers before creating the document
-    const filename = `reporte-reglas-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `reporte-reglas-simulaciones-${new Date().toISOString().split('T')[0]}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
@@ -277,7 +342,7 @@ router.get('/export/pdf', async (req, res) => {
     // Add title
     doc.fontSize(20)
        .font('Helvetica-Bold')
-       .text('REPORTE DE REGLAS DE NEGOCIO', 50, 50, { align: 'center', width: 495 });
+       .text('REPORTE DE REGLAS DE NEGOCIO Y SIMULACIONES', 50, 50, { align: 'center', width: 495 });
     
     // Add generation date
     const currentDate = new Date().toLocaleDateString('es-MX');
@@ -339,6 +404,37 @@ router.get('/export/pdf', async (req, res) => {
             width: 450,
             continued: false 
           });
+          currentY = doc.y + 5;
+        }
+        
+        // Add simulation statistics section
+        if (rule.total_simulaciones > 0) {
+          doc.fontSize(10)
+             .font('Helvetica-Bold')
+             .text(`Estadísticas de Simulación:`, 70, currentY);
+          
+          currentY += 15;
+          doc.fontSize(9)
+             .font('Helvetica')
+             .text(`• Total simulaciones: ${rule.total_simulaciones}`, 90, currentY)
+             .text(`• Simulaciones de texto: ${rule.simulaciones_texto}`, 90, currentY + 12)
+             .text(`• Simulaciones de archivo: ${rule.simulaciones_archivo}`, 90, currentY + 24);
+          
+          if (rule.ultima_simulacion) {
+            const ultimaSimulacion = new Date(rule.ultima_simulacion).toLocaleDateString('es-MX');
+            doc.text(`• Última simulación: ${ultimaSimulacion}`, 90, currentY + 36);
+            currentY += 48;
+          } else {
+            currentY += 36;
+          }
+        } else {
+          doc.fontSize(9)
+             .font('Helvetica')
+             .text(`Sin simulaciones realizadas`, 70, currentY, { 
+               fontStyle: 'italic',
+               color: '#666666'
+             });
+          currentY += 15;
         }
         
         doc.moveDown(1.5);

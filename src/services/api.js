@@ -141,6 +141,37 @@ export const rulesService = {
       handleNetworkError(error);
     }
   },
+
+  // Get all business rules for management
+  async getAllRules() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/rules/list`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
+
+  // Update business rule
+  async updateRule(ruleId, ruleData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/rules/${ruleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ruleData),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
 };
 
 // AI Services

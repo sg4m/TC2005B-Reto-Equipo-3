@@ -317,4 +317,182 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
+// Get all rules for the Reglas management page
+router.get('/list', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        id_regla,
+        status,
+        fecha_creacion,
+        input_usuario,
+        resumen,
+        archivo_original,
+        regla_estandarizada
+      FROM reglanegocio
+      ORDER BY fecha_creacion DESC
+    `;
+    
+    const result = await db.query(query);
+    
+    // Format data for frontend consumption
+    const rulesData = result.rows.map(row => {
+      const metadata = row.regla_estandarizada?.metadata || {};
+      
+      return {
+        id_regla: row.id_regla,
+        usuario: metadata.usuario || 'Usuario Sistema',
+        email: metadata.email || 'sistema@banorte.com',
+        empresa: metadata.empresa || 'Banorte',
+        fecha_creacion: row.fecha_creacion,
+        status: row.status || 'N/A',
+        descripcion: row.resumen || row.input_usuario || 'Sin descripción',
+        // Format ID for display
+        id_display: `REG-${String(row.id_regla).padStart(4, '0')}`,
+        // Include additional metadata fields if they exist
+        monto_minimo: metadata.monto_minimo,
+        monto_maximo: metadata.monto_maximo,
+        region: metadata.region,
+        tipo_transaccion: metadata.tipo_transaccion
+      };
+    });
+
+    res.json(rulesData);
+  } catch (error) {
+    console.error('Error fetching rules list:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+// Update business rule data
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      usuario,
+      email,
+      empresa,
+      status,
+      descripcion,
+      monto_minimo,
+      monto_maximo,
+      region,
+      tipo_transaccion
+    } = req.body;
+
+    // Build dynamic update query based on provided fields
+    const updateFields = [];
+    const values = [];
+    let valueIndex = 1;
+
+    // Map frontend fields to database fields
+    if (status !== undefined) {
+      updateFields.push(`status = $${valueIndex++}`);
+      values.push(status);
+    }
+    
+    if (descripcion !== undefined) {
+      updateFields.push(`resumen = $${valueIndex++}`);
+      values.push(descripcion);
+    }
+
+    // Additional fields - these might need to be added to the database schema
+    // For now, we'll update the existing JSON structure in regla_estandarizada
+    if (usuario !== undefined || email !== undefined || empresa !== undefined ||
+        monto_minimo !== undefined || monto_maximo !== undefined ||
+        region !== undefined || tipo_transaccion !== undefined) {
+      
+      // Get current rule data
+      const currentRule = await db.query(
+        'SELECT regla_estandarizada FROM reglanegocio WHERE id_regla = $1',
+        [id]
+      );
+
+      if (currentRule.rows.length === 0) {
+        return res.status(404).json({ 
+          error: 'Regla no encontrada' 
+        });
+      }
+
+      // Update the JSON structure with additional metadata
+      let ruleData = currentRule.rows[0].regla_estandarizada || {};
+      
+      // Add metadata section if it doesn't exist
+      if (!ruleData.metadata) {
+        ruleData.metadata = {};
+      }
+
+      // Update metadata fields
+      if (usuario !== undefined) ruleData.metadata.usuario = usuario;
+      if (email !== undefined) ruleData.metadata.email = email;
+      if (empresa !== undefined) ruleData.metadata.empresa = empresa;
+      if (monto_minimo !== undefined) ruleData.metadata.monto_minimo = monto_minimo;
+      if (monto_maximo !== undefined) ruleData.metadata.monto_maximo = monto_maximo;
+      if (region !== undefined) ruleData.metadata.region = region;
+      if (tipo_transaccion !== undefined) ruleData.metadata.tipo_transaccion = tipo_transaccion;
+
+      updateFields.push(`regla_estandarizada = $${valueIndex++}`);
+      values.push(JSON.stringify(ruleData));
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ 
+        error: 'No hay campos para actualizar' 
+      });
+    }
+
+    // Add the ID parameter at the end
+    values.push(id);
+    const idIndex = valueIndex;
+
+    const query = `
+      UPDATE reglanegocio 
+      SET ${updateFields.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_regla = $${idIndex}
+      RETURNING *
+    `;
+
+    const result = await db.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Regla no encontrada' 
+      });
+    }
+
+    // Format the response similar to the list endpoint
+    const updatedRule = result.rows[0];
+    const formattedRule = {
+      id_regla: updatedRule.id_regla,
+      usuario: updatedRule.regla_estandarizada?.metadata?.usuario || 'Usuario Sistema',
+      email: updatedRule.regla_estandarizada?.metadata?.email || 'sistema@banorte.com',
+      empresa: updatedRule.regla_estandarizada?.metadata?.empresa || 'Banorte',
+      fecha_creacion: updatedRule.fecha_creacion,
+      status: updatedRule.status || 'N/A',
+      descripcion: updatedRule.resumen || updatedRule.input_usuario || 'Sin descripción',
+      id_display: `REG-${String(updatedRule.id_regla).padStart(4, '0')}`,
+      // Include additional metadata fields if they exist
+      monto_minimo: updatedRule.regla_estandarizada?.metadata?.monto_minimo,
+      monto_maximo: updatedRule.regla_estandarizada?.metadata?.monto_maximo,
+      region: updatedRule.regla_estandarizada?.metadata?.region,
+      tipo_transaccion: updatedRule.regla_estandarizada?.metadata?.tipo_transaccion
+    };
+
+    res.json({
+      message: 'Regla actualizada exitosamente',
+      regla: formattedRule
+    });
+
+  } catch (error) {
+    console.error('Error updating rule:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
 module.exports = router;

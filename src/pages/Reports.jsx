@@ -715,7 +715,7 @@ const Reports = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <PlayCircleIcon sx={{ color: '#2196f3', fontSize: 24, mr: 1 }} />
                     <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
-                      Reglas en simulación:
+                      Reglas simuladas:
                     </Typography>
                   </Box>
                   <Typography variant="h4" sx={{ fontWeight: 700, color: '#2196f3' }}>
