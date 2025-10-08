@@ -338,7 +338,7 @@ const Historial = () => {
       hour: '2-digit',
       minute: '2-digit'
     }) : 'No disponible',
-    userId: currentUser.id_usuario || 'N/A',
+    userId: currentUser.id || 'N/A',
     role: 'Administrador'
   } : {
     name: 'Usuario Invitado',

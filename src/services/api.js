@@ -1,5 +1,6 @@
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -166,6 +167,21 @@ export const rulesService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(ruleData),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
+
+  // Delete business rule
+  async deleteRule(ruleId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/rules/${ruleId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       return await handleResponse(response);
     } catch (error) {

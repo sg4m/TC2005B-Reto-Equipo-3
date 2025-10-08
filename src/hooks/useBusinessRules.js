@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { rulesService } from '../services/api';
 
-export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
+export const useBusinessRules = (usuarioId) => { // User ID required for proper session isolation
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentRule, setCurrentRule] = useState(null);
@@ -107,44 +107,46 @@ export const useBusinessRules = (usuarioId = 1) => { // Default user ID for demo
     }
   }, [currentRule, loadMovements]);
 
-  // Get all business rules for management
+  // Get user-specific business rules for management
   const getAllBusinessRules = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await rulesService.getAllRules();
-      setBusinessRules(result || []);
-      return result;
+      const result = await rulesService.getUserRules(usuarioId);
+      setBusinessRules(result.reglas || []);
+      return result.reglas || [];
     } catch (err) {
       setError(err.message);
       setBusinessRules([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [usuarioId]);
 
-  // Refresh all rules (alias for better naming)
+  // Refresh user rules (alias for better naming)
   const refreshRules = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await rulesService.getAllRules();
-      setBusinessRules(result || []);
-      return result;
+      const result = await rulesService.getUserRules(usuarioId);
+      setBusinessRules(result.reglas || []);
+      return result.reglas || [];
     } catch (err) {
       setError(err.message);
       setBusinessRules([]);
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies to prevent infinite loops
+  }, [usuarioId]); // Include usuarioId dependency to refresh when user changes
 
-  // Auto-load business rules on hook initialization
+  // Auto-load business rules when user changes
   useEffect(() => {
-    refreshRules();
-  }, []); // Empty dependency array - only run once on mount
+    if (usuarioId) {
+      refreshRules();
+    }
+  }, [usuarioId, refreshRules]); // Re-load when user ID changes
 
   // Clear current state
   const clearState = useCallback(() => {

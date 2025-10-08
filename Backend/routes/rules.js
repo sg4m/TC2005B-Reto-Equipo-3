@@ -90,7 +90,7 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
       // - resumen: AI-generated summary  
       // - regla_estandarizada: complete JSON structure
       const result = await db.query(
-        'INSERT INTO reglanegocio (id_usuario, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        'INSERT INTO reglanegocio (usuario_id, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [
           usuario_id,
           'Activa',
@@ -103,7 +103,7 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
 
       // Update AI response rule IDs to match database ID
       if (aiResponse && aiResponse.rules) {
-        const dbId = result.rows[0].id_regla;
+        const dbId = result.rows[0].id;
         aiResponse.rules = aiResponse.rules.map((rule, index) => ({
           ...rule,
           id: `rule_${dbId}_${index + 1}`
@@ -111,7 +111,7 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
 
         // Update the database with the corrected rule IDs
         await db.query(
-          'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+          'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id = $2',
           [JSON.stringify(aiResponse), dbId]
         );
       }
@@ -149,7 +149,7 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
       };
 
       const result = await db.query(
-        'INSERT INTO reglanegocio (id_usuario, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        'INSERT INTO reglanegocio (usuario_id, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [
           usuario_id,
           'Inactiva',
@@ -161,11 +161,11 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
       );
 
       // Update error rule ID to match database ID
-      const dbId = result.rows[0].id_regla;
+      const dbId = result.rows[0].id;
       errorResponse.rules[0].id = `rule_${dbId}_error`;
       
       await db.query(
-        'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2',
+        'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id = $2',
         [JSON.stringify(errorResponse), dbId]
       );
 
@@ -191,7 +191,7 @@ router.get('/user/:id_usuario', async (req, res) => {
     const { id_usuario } = req.params;
     
     const result = await db.query(
-      'SELECT * FROM reglanegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC',
+      'SELECT * FROM reglanegocio WHERE usuario_id = $1 ORDER BY fecha_creacion DESC',
       [id_usuario]
     );
 
@@ -212,14 +212,14 @@ router.get('/movements/:id_usuario', async (req, res) => {
     const { id_usuario } = req.params;
     
     const result = await db.query(
-      'SELECT id_regla, resumen, fecha_creacion, status FROM reglanegocio WHERE id_usuario = $1 ORDER BY fecha_creacion DESC LIMIT 5',
+      'SELECT id, resumen, fecha_creacion, status FROM reglanegocio WHERE usuario_id = $1 ORDER BY fecha_creacion DESC LIMIT 5',
       [id_usuario]
     );
 
     // Format for dashboard display
     const movements = result.rows.map(row => ({
-      id: row.id_regla,
-      description: `Se creó la Regla ${row.id_regla} el día ${new Date(row.fecha_creacion).toLocaleDateString('es-ES')} a las ${new Date(row.fecha_creacion).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`,
+      id: row.id,
+      description: `Se creó la Regla ${row.id} el día ${new Date(row.fecha_creacion).toLocaleDateString('es-ES')} a las ${new Date(row.fecha_creacion).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`,
       status: row.status,
       fecha: row.fecha_creacion
     }));
@@ -249,7 +249,7 @@ router.post('/:id/refine', async (req, res) => {
 
     // Get existing rule
     const existingRule = await db.query(
-      'SELECT * FROM reglanegocio WHERE id_regla = $1',
+      'SELECT * FROM reglanegocio WHERE id = $1',
       [id]
     );
 
@@ -267,7 +267,7 @@ router.post('/:id/refine', async (req, res) => {
 
     // Update rule in database
     const result = await db.query(
-      'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id_regla = $2 RETURNING *',
+      'UPDATE reglanegocio SET regla_estandarizada = $1 WHERE id = $2 RETURNING *',
       [JSON.stringify(refinedResponse), id]
     );
 
@@ -296,7 +296,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     const result = await db.query(
-      'UPDATE reglanegocio SET status = $1 WHERE id_regla = $2 RETURNING *',
+      'UPDATE reglanegocio SET status = $1 WHERE id = $2 RETURNING *',
       [estado, id]
     );
 
@@ -322,7 +322,7 @@ router.get('/list', async (req, res) => {
   try {
     const query = `
       SELECT 
-        id_regla,
+        id,
         status,
         fecha_creacion,
         input_usuario,
@@ -340,7 +340,7 @@ router.get('/list', async (req, res) => {
       const metadata = row.regla_estandarizada?.metadata || {};
       
       return {
-        id_regla: row.id_regla,
+        id_regla: row.id,
         usuario: metadata.usuario || 'Usuario Sistema',
         email: metadata.email || 'sistema@banorte.com',
         empresa: metadata.empresa || 'Banorte',
@@ -348,7 +348,7 @@ router.get('/list', async (req, res) => {
         status: row.status || 'N/A',
         descripcion: row.resumen || row.input_usuario || 'Sin descripción',
         // Format ID for display
-        id_display: `REG-${String(row.id_regla).padStart(4, '0')}`,
+        id_display: `REG-${String(row.id).padStart(4, '0')}`,
         // Include additional metadata fields if they exist
         monto_minimo: metadata.monto_minimo,
         monto_maximo: metadata.monto_maximo,
@@ -407,7 +407,7 @@ router.put('/:id', async (req, res) => {
       
       // Get current rule data
       const currentRule = await db.query(
-        'SELECT regla_estandarizada FROM reglanegocio WHERE id_regla = $1',
+        'SELECT regla_estandarizada FROM reglanegocio WHERE id = $1',
         [id]
       );
 
@@ -451,7 +451,7 @@ router.put('/:id', async (req, res) => {
     const query = `
       UPDATE reglanegocio 
       SET ${updateFields.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE id_regla = $${idIndex}
+      WHERE id = $${idIndex}
       RETURNING *
     `;
 
@@ -466,14 +466,14 @@ router.put('/:id', async (req, res) => {
     // Format the response similar to the list endpoint
     const updatedRule = result.rows[0];
     const formattedRule = {
-      id_regla: updatedRule.id_regla,
+      id_regla: updatedRule.id,
       usuario: updatedRule.regla_estandarizada?.metadata?.usuario || 'Usuario Sistema',
       email: updatedRule.regla_estandarizada?.metadata?.email || 'sistema@banorte.com',
       empresa: updatedRule.regla_estandarizada?.metadata?.empresa || 'Banorte',
       fecha_creacion: updatedRule.fecha_creacion,
       status: updatedRule.status || 'N/A',
       descripcion: updatedRule.resumen || updatedRule.input_usuario || 'Sin descripción',
-      id_display: `REG-${String(updatedRule.id_regla).padStart(4, '0')}`,
+      id_display: `REG-${String(updatedRule.id).padStart(4, '0')}`,
       // Include additional metadata fields if they exist
       monto_minimo: updatedRule.regla_estandarizada?.metadata?.monto_minimo,
       monto_maximo: updatedRule.regla_estandarizada?.metadata?.monto_maximo,
@@ -488,6 +488,69 @@ router.put('/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating rule:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
+    });
+  }
+});
+
+// Delete business rule
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First check if the rule exists
+    const existingRule = await db.query(
+      'SELECT * FROM reglanegocio WHERE id = $1',
+      [id]
+    );
+
+    if (existingRule.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Regla no encontrada' 
+      });
+    }
+
+    const rule = existingRule.rows[0];
+
+    // Delete any associated file if it exists
+    if (rule.archivo_original) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(rule.archivo_original)) {
+          fs.unlinkSync(rule.archivo_original);
+          console.log(`Deleted file: ${rule.archivo_original}`);
+        }
+      } catch (fileError) {
+        console.error('Error deleting associated file:', fileError);
+        // Continue with database deletion even if file deletion fails
+      }
+    }
+
+    // Delete the rule from the database
+    const result = await db.query(
+      'DELETE FROM reglanegocio WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    // Format the deleted rule info for response
+    const deletedRule = result.rows[0];
+    const formattedRule = {
+      id_regla: deletedRule.id,
+      id_display: `REG-${String(deletedRule.id).padStart(4, '0')}`,
+      usuario: deletedRule.regla_estandarizada?.metadata?.usuario || 'Usuario Sistema',
+      empresa: deletedRule.regla_estandarizada?.metadata?.empresa || 'Banorte',
+      descripcion: deletedRule.resumen || deletedRule.input_usuario || 'Sin descripción'
+    };
+
+    res.json({
+      message: 'Regla eliminada exitosamente',
+      regla_eliminada: formattedRule
+    });
+
+  } catch (error) {
+    console.error('Error deleting rule:', error);
     res.status(500).json({ 
       error: 'Error interno del servidor',
       message: error.message 

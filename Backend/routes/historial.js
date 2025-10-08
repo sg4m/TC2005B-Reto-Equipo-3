@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
   try {
     const query = `
       SELECT 
-        id_regla,
+        id,
         status,
         fecha_creacion,
         input_usuario,
@@ -20,8 +20,8 @@ router.get('/', async (req, res) => {
     
     // Format data for frontend consumption
     const historialData = result.rows.map(row => ({
-      id: `REG-${String(row.id_regla).padStart(4, '0')}`,
-      id_regla: row.id_regla,
+      id: `REG-${String(row.id).padStart(4, '0')}`,
+      id_regla: row.id,
       status: row.status || 'N/A',
       createdAt: row.fecha_creacion,
       summary: row.resumen || row.input_usuario || 'Sin descripción disponible'
@@ -44,7 +44,7 @@ router.post('/filtered', async (req, res) => {
     
     let query = `
       SELECT 
-        id_regla,
+        id,
         status,
         fecha_creacion,
         input_usuario,
@@ -62,7 +62,7 @@ router.post('/filtered', async (req, res) => {
       
       switch (filterBy) {
         case 'id':
-          query += ` AND LOWER(CAST(id_regla AS TEXT)) LIKE $${paramIndex}`;
+          query += ` AND LOWER(CAST(id AS TEXT)) LIKE $${paramIndex}`;
           params.push(searchValue);
           paramIndex++;
           break;
@@ -79,7 +79,7 @@ router.post('/filtered', async (req, res) => {
         case 'all':
         default:
           query += ` AND (
-            LOWER(CAST(id_regla AS TEXT)) LIKE $${paramIndex} OR
+            LOWER(CAST(id AS TEXT)) LIKE $${paramIndex} OR
             LOWER(TO_CHAR(fecha_creacion, 'YYYY-MM-DD HH24:MI')) LIKE $${paramIndex + 1} OR
             LOWER(resumen) LIKE $${paramIndex + 2} OR
             LOWER(input_usuario) LIKE $${paramIndex + 3}
@@ -96,8 +96,8 @@ router.post('/filtered', async (req, res) => {
     
     // Format data for frontend consumption
     const historialData = result.rows.map(row => ({
-      id: `REG-${String(row.id_regla).padStart(4, '0')}`,
-      id_regla: row.id_regla,
+      id: `REG-${String(row.id).padStart(4, '0')}`,
+      id_regla: row.id,
       status: row.status || 'N/A',
       createdAt: row.fecha_creacion,
       summary: row.resumen || row.input_usuario || 'Sin descripción disponible'

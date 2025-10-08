@@ -1,10 +1,11 @@
 // Authentication service for handling login and registration API calls
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 class AuthService {
   constructor() {
     this.baseURL = API_BASE_URL;
+    console.log('🔧 AuthService initialized with API URL:', this.baseURL);
   }
 
   // Register new user
@@ -18,7 +19,7 @@ class AuthService {
       });
       console.log('🌐 API URL:', `${this.baseURL}/auth/register`);
       
-      const response = await fetch(`${this.baseURL}/auth/register`, {
+      const response = await fetch(`${this.baseURL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,13 +62,13 @@ class AuthService {
       console.log('🔐 Frontend login attempt:', { usuario: credentials.usuario, contrasenia: '***' });
       console.log('🌐 API URL:', `${this.baseURL}/auth/login`);
       
-      const response = await fetch(`${this.baseURL}/auth/login`, {
+      const response = await fetch(`${this.baseURL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          usuario: credentials.usuario, // Can be username or email
+          correo: credentials.usuario, // Can be username or email
           contrasenia: credentials.contrasenia
         }),
       });
@@ -141,7 +142,7 @@ class AuthService {
         throw new Error('No hay usuario autenticado');
       }
 
-      console.log('🔐 Frontend change password attempt for user:', currentUser.id_usuario);
+      console.log('🔐 Frontend change password attempt for user:', currentUser.id);
       console.log('🌐 API URL:', `${this.baseURL}/auth/change-password`);
       
       const response = await fetch(`${this.baseURL}/auth/change-password`, {
@@ -150,7 +151,7 @@ class AuthService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: currentUser.id_usuario,
+          userId: currentUser.id,
           currentPassword: currentPassword,
           newPassword: newPassword
         }),

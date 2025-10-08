@@ -92,7 +92,7 @@ const Dashboard = () => {
     generateRule,
     loadMovements,
     clearState
-  } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
+  } = useBusinessRules(authService.getCurrentUser()?.id);
 
   // Conversation hook
   const {
@@ -505,7 +505,7 @@ const Dashboard = () => {
       hour: '2-digit',
       minute: '2-digit'
     }) : 'No disponible',
-    userId: currentUser.id_usuario || 'N/A',
+    userId: currentUser.id || 'N/A',
   } : {
     name: 'Usuario Invitado',
     email: 'guest@banorte.com',

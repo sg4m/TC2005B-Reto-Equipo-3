@@ -113,7 +113,7 @@ const Reports = () => {
     isLoading: movementsLoading,
     movements,
     loadMovements
-  } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
+  } = useBusinessRules(authService.getCurrentUser()?.id);
   
   // Global notifications hook
   const { notifications, unreadCount, markAsRead, markAllAsRead, addNotification } = useGlobalNotifications();
@@ -328,7 +328,7 @@ const Reports = () => {
       hour: '2-digit',
       minute: '2-digit'
     }) : 'No disponible',
-    userId: currentUser.id_usuario || 'N/A',
+    userId: currentUser.id || 'N/A',
   } : {
     name: 'Usuario Invitado',
     email: 'guest@banorte.com',

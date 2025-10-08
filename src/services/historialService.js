@@ -4,7 +4,8 @@
 // This service handles all historial-related API calls
 
 // API Base Configuration
-const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/historial`;
+// const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || '/api'}/historial`;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -27,7 +28,7 @@ class HistorialService {
   // Get all historial data
   async getHistorialData() {
     try {
-      const response = await fetch(API_BASE_URL, {
+      const response = await fetch(`${API_BASE_URL}/historial`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +44,7 @@ class HistorialService {
   // Get filtered historial data
   async getFilteredHistorial(searchTerm = '', filterBy = 'all') {
     try {
-      const response = await fetch(`${API_BASE_URL}/filtered`, {
+      const response = await fetch(`${API_BASE_URL}/historial/filtered`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +64,7 @@ class HistorialService {
   // Get historial statistics
   async getHistorialStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats`, {
+      const response = await fetch(`${API_BASE_URL}/historial/stats`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

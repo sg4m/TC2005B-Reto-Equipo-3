@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
 
     // Check if user already exists
     const existingUser = await db.query(
-      'SELECT * FROM usuario WHERE correo = $1 OR usuario = $2',
+      'SELECT * FROM usuario WHERE correo = $1 OR nombre = $2',
       [correo, usuario]
     );
 
@@ -33,7 +33,7 @@ router.post('/register', async (req, res) => {
 
     // Insert new user
     const result = await db.query(
-      'INSERT INTO usuario (correo, usuario, contrasenia, pais_region) VALUES ($1, $2, $3, $4) RETURNING id_usuario, correo, usuario, pais_region, fecha_registro',
+      'INSERT INTO usuario (correo, nombre, contraseña, pais_region) VALUES ($1, $2, $3, $4) RETURNING id, correo, nombre, pais_region, fecha_creacion',
       [correo, usuario, hashedPassword, pais_region]
     );
 
@@ -64,7 +64,7 @@ router.post('/login', async (req, res) => {
 
     // Find user by username or email
     const result = await db.query(
-      'SELECT * FROM usuario WHERE usuario = $1 OR correo = $1',
+      'SELECT * FROM usuario WHERE nombre = $1 OR correo = $1',
       [usuario]
     );
     console.log('User search result:', result.rows.length > 0 ? 'User found' : 'User not found');
@@ -79,7 +79,7 @@ router.post('/login', async (req, res) => {
     const user = result.rows[0];
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(contrasenia, user.contrasenia);
+    const isValidPassword = await bcrypt.compare(contrasenia, user.contraseña);
     console.log('Password verification:', isValidPassword ? 'Valid' : 'Invalid');
 
     if (!isValidPassword) {
@@ -90,7 +90,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Remove password from response
-    const { contrasenia: _, ...userWithoutPassword } = user;
+    const { contraseña: _, ...userWithoutPassword } = user;
 
     res.json({
       message: 'Login exitoso',
@@ -114,7 +114,7 @@ router.post('/forgot-password', async (req, res) => {
   try {
     // Check if user exists with this email
     const userResult = await db.query(
-      'SELECT id_usuario, usuario FROM usuario WHERE correo = $1',
+      'SELECT id, nombre FROM usuario WHERE correo = $1',
       [email]
     );
 
@@ -132,11 +132,11 @@ router.post('/forgot-password', async (req, res) => {
     
     // Update user's password in database
     await db.query(
-      'UPDATE usuario SET contrasenia = $1 WHERE id_usuario = $2',
-      [hashedTempPassword, user.id_usuario]
+      'UPDATE usuario SET contraseña = $1 WHERE id = $2',
+      [hashedTempPassword, user.id]
     );
     
-    console.log(`Password reset for user: ${user.usuario} (${email})`);
+    console.log(`Password reset for user: ${user.nombre} (${email})`);
     
     res.status(200).json({ 
       message: 'Contraseña restablecida exitosamente',
@@ -169,7 +169,7 @@ router.post('/change-password', async (req, res) => {
   try {
     // Get user from database
     const userResult = await db.query(
-      'SELECT id_usuario, usuario, contrasenia FROM usuario WHERE id_usuario = $1',
+      'SELECT id, nombre, contraseña FROM usuario WHERE id = $1',
       [userId]
     );
 
@@ -182,7 +182,7 @@ router.post('/change-password', async (req, res) => {
     const user = userResult.rows[0];
     
     // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.contrasenia);
+    const isValidPassword = await bcrypt.compare(currentPassword, user.contraseña);
     
     if (!isValidPassword) {
       return res.status(401).json({ 
@@ -195,7 +195,7 @@ router.post('/change-password', async (req, res) => {
     
     // Update user's password in database
     const updateResult = await db.query(
-      'UPDATE usuario SET contrasenia = $1 WHERE id_usuario = $2 RETURNING id_usuario',
+      'UPDATE usuario SET contraseña = $1 WHERE id = $2 RETURNING id',
       [hashedNewPassword, userId]
     );
     
@@ -205,7 +205,7 @@ router.post('/change-password', async (req, res) => {
       });
     }
     
-    console.log(`Password changed for user: ${user.usuario} (ID: ${userId})`);
+    console.log(`Password changed for user: ${user.nombre} (ID: ${userId})`);
     
     res.status(200).json({ 
       message: 'Contraseña cambiada exitosamente',

@@ -4,7 +4,7 @@
 // This service connects to the backend API endpoints
 
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {

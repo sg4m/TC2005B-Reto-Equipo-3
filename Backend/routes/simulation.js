@@ -57,7 +57,7 @@ router.post('/text', async (req, res) => {
 
     // Get the business rule from database
     const ruleResult = await db.query(
-      'SELECT * FROM reglanegocio WHERE id_regla = $1',
+      'SELECT * FROM reglanegocio WHERE id = $1',
       [rule_id]
     );
 
@@ -72,7 +72,7 @@ router.post('/text', async (req, res) => {
     // Prepare simulation context for Gemini AI
     const simulationContext = {
       rule: {
-        id: rule.id_regla,
+        id: rule.id,
         description: rule.resumen || rule.input_usuario,
         status: rule.status,
         details: rule.regla_estandarizada
@@ -86,7 +86,7 @@ router.post('/text', async (req, res) => {
 
     // Store simulation result in database
     const simulationResult = await db.query(
-      'INSERT INTO simulacion_reglas (id_regla, tipo_entrada, datos_entrada, resultado_ia, fecha_simulacion) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING *',
+      'INSERT INTO simulacion_reglas (regla_id, tipo_entrada, datos_entrada, resultado_ia, fecha_simulacion) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING *',
       [
         rule_id,
         'text',
@@ -97,9 +97,9 @@ router.post('/text', async (req, res) => {
 
     res.status(201).json({
       message: 'Simulación completada exitosamente',
-      simulation_id: simulationResult.rows[0].id_simulacion,
+      simulation_id: simulationResult.rows[0].id,
       rule: {
-        id: rule.id_regla,
+        id: rule.id,
         description: rule.resumen
       },
       analysis: aiResponse.analysis || 'Análisis completado',
@@ -128,7 +128,7 @@ router.post('/file', upload.single('test_file'), async (req, res) => {
 
     // Get the business rule from database
     const ruleResult = await db.query(
-      'SELECT * FROM reglanegocio WHERE id_regla = $1',
+      'SELECT * FROM reglanegocio WHERE id = $1',
       [rule_id]
     );
 
@@ -178,7 +178,7 @@ router.post('/file', upload.single('test_file'), async (req, res) => {
     // Prepare simulation context for Gemini AI
     const simulationContext = {
       rule: {
-        id: rule.id_regla,
+        id: rule.id,
         description: rule.resumen || rule.input_usuario,
         status: rule.status,
         details: rule.regla_estandarizada
@@ -194,7 +194,7 @@ router.post('/file', upload.single('test_file'), async (req, res) => {
 
     // Store simulation result in database
     const simulationResult = await db.query(
-      'INSERT INTO simulacion_reglas (id_regla, tipo_entrada, datos_entrada, archivo_original, resultado_ia, fecha_simulacion) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING *',
+      'INSERT INTO simulacion_reglas (regla_id, tipo_entrada, datos_entrada, archivo_original, resultado_ia, fecha_simulacion) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING *',
       [
         rule_id,
         'file',
@@ -206,9 +206,9 @@ router.post('/file', upload.single('test_file'), async (req, res) => {
 
     res.status(201).json({
       message: 'Simulación con archivo completada exitosamente',
-      simulation_id: simulationResult.rows[0].id_simulacion,
+      simulation_id: simulationResult.rows[0].id,
       rule: {
-        id: rule.id_regla,
+        id: rule.id,
         description: rule.resumen
       },
       file: {
@@ -235,12 +235,12 @@ router.get('/history/:rule_id', async (req, res) => {
     const { rule_id } = req.params;
 
     const result = await db.query(
-      'SELECT id_simulacion, tipo_entrada, archivo_original, fecha_simulacion, resultado_ia FROM simulacion_reglas WHERE id_regla = $1 ORDER BY fecha_simulacion DESC LIMIT 20',
+      'SELECT id, tipo_entrada, archivo_original, fecha_simulacion, resultado_ia FROM simulacion_reglas WHERE regla_id = $1 ORDER BY fecha_simulacion DESC LIMIT 20',
       [rule_id]
     );
 
     const history = result.rows.map(row => ({
-      id: row.id_simulacion,
+      id: row.id,
       type: row.tipo_entrada,
       file_name: row.archivo_original,
       date: row.fecha_simulacion,
@@ -269,7 +269,7 @@ router.get('/details/:simulation_id', async (req, res) => {
     const { simulation_id } = req.params;
 
     const result = await db.query(
-      'SELECT * FROM simulacion_reglas WHERE id_simulacion = $1',
+      'SELECT * FROM simulacion_reglas WHERE id = $1',
       [simulation_id]
     );
 
@@ -284,8 +284,8 @@ router.get('/details/:simulation_id', async (req, res) => {
     res.json({
       message: 'Detalles obtenidos exitosamente',
       simulation: {
-        id: simulation.id_simulacion,
-        rule_id: simulation.id_regla,
+        id: simulation.id,
+        rule_id: simulation.regla_id,
         input_type: simulation.tipo_entrada,
         input_data: simulation.datos_entrada,
         file_name: simulation.archivo_original,

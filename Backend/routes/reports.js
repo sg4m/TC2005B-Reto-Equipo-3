@@ -20,7 +20,7 @@ router.get('/data', async (req, res) => {
     `;
     
     const simulationRulesQuery = `
-      SELECT COUNT(DISTINCT id_regla) as count 
+      SELECT COUNT(DISTINCT regla_id) as count 
       FROM simulacion_reglas
     `;
     
@@ -36,19 +36,19 @@ router.get('/data', async (req, res) => {
       WHERE fecha_registro > NOW() - INTERVAL '30 days'
     `;
     
-    // Get most and least used rules
+    // Get most and least used rules (based on simulations)
     const mostUsedRuleQuery = `
-      SELECT id_regla, COUNT(*) as usage_count 
-      FROM historial_reglas 
-      GROUP BY id_regla 
+      SELECT regla_id as id, COUNT(*) as usage_count 
+      FROM simulacion_reglas 
+      GROUP BY regla_id 
       ORDER BY usage_count DESC 
       LIMIT 1
     `;
     
     const leastUsedRuleQuery = `
-      SELECT id_regla, COUNT(*) as usage_count 
-      FROM historial_reglas 
-      GROUP BY id_regla 
+      SELECT regla_id as id, COUNT(*) as usage_count 
+      FROM simulacion_reglas 
+      GROUP BY regla_id 
       ORDER BY usage_count ASC 
       LIMIT 1
     `;
@@ -62,21 +62,19 @@ router.get('/data', async (req, res) => {
     
     const lastModifiedRuleQuery = `
       SELECT * FROM reglanegocio 
-      ORDER BY fecha_modificacion DESC 
+      ORDER BY fecha_actualizacion DESC 
       LIMIT 1
     `;
     
-    // Get most successful rule (highest success rate)
+    // Get most successful rule (most simulated)
     const mostSuccessfulRuleQuery = `
       SELECT r.*, 
-             COUNT(h.id) as total_executions,
-             COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions,
-             (COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) * 100.0 / COUNT(h.id)) as success_rate
+             COUNT(s.id) as total_simulations
       FROM reglanegocio r
-      LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
-      GROUP BY r.id_regla
-      HAVING COUNT(h.id) > 0
-      ORDER BY success_rate DESC, total_executions DESC
+      LEFT JOIN simulacion_reglas s ON r.id = s.regla_id
+      GROUP BY r.id
+      HAVING COUNT(s.id) > 0
+      ORDER BY total_simulations DESC
       LIMIT 1
     `;
 
@@ -111,8 +109,8 @@ router.get('/data', async (req, res) => {
       simulationRules: parseInt(simulationRulesResult.rows[0]?.count || 0),
       totalUsers: parseInt(totalUsersResult.rows[0]?.count || 0),
       activeUsers: parseInt(activeUsersResult.rows[0]?.count || 0),
-      mostUsedRuleId: mostUsedRuleResult.rows[0]?.id_regla || 'N/A',
-      leastUsedRuleId: leastUsedRuleResult.rows[0]?.id_regla || 'N/A',
+      mostUsedRuleId: mostUsedRuleResult.rows[0]?.id || 'N/A',
+      leastUsedRuleId: leastUsedRuleResult.rows[0]?.id || 'N/A',
       lastCreatedRule: lastCreatedRuleResult.rows[0] || null,
       lastModifiedRule: lastModifiedRuleResult.rows[0] || null,
       mostSuccessfulRule: mostSuccessfulRuleResult.rows[0] || null
@@ -190,12 +188,12 @@ router.get('/simulation-stats', async (req, res) => {
   try {
     const simulationStatsQuery = `
       SELECT 
-        COUNT(DISTINCT s.id_regla) as rules_with_simulations,
-        COUNT(s.id_simulacion) as total_simulations,
+        COUNT(DISTINCT s.regla_id) as rules_with_simulations,
+        COUNT(s.id) as total_simulations,
         COUNT(CASE WHEN s.tipo_entrada = 'text' THEN 1 END) as text_simulations,
         COUNT(CASE WHEN s.tipo_entrada = 'file' THEN 1 END) as file_simulations
       FROM simulacion_reglas s
-      INNER JOIN reglanegocio r ON s.id_regla = r.id_regla
+      INNER JOIN reglanegocio r ON s.regla_id = r.id
     `;
     
     const result = await db.query(simulationStatsQuery);
@@ -224,7 +222,7 @@ router.get('/export/csv', async (req, res) => {
     // Get comprehensive data for CSV export including simulation statistics
     const rulesQuery = `
       SELECT 
-        r.id_regla,
+        r.id,
         r.status,
         r.fecha_creacion,
         r.input_usuario,
@@ -238,14 +236,14 @@ router.get('/export/csv', async (req, res) => {
       FROM reglanegocio r
       LEFT JOIN (
         SELECT 
-          id_regla,
+          regla_id,
           COUNT(*) as total_simulations,
           COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
           COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
           MAX(fecha_simulacion) as last_simulation_date
         FROM simulacion_reglas 
-        GROUP BY id_regla
-      ) s ON r.id_regla = s.id_regla
+        GROUP BY regla_id
+      ) s ON r.id = s.regla_id
       ORDER BY r.fecha_creacion DESC
     `;
     
@@ -257,7 +255,7 @@ router.get('/export/csv', async (req, res) => {
       const reglaEstandarizada = row.regla_estandarizada ? String(row.regla_estandarizada).substring(0, 100) : '';
       const ultimaSimulacion = row.ultima_simulacion ? new Date(row.ultima_simulacion).toISOString().split('T')[0] : 'N/A';
       return [
-        row.id_regla || '',
+        row.id || '',
         row.status || '',
         row.fecha_creacion ? new Date(row.fecha_creacion).toISOString().split('T')[0] : '',
         `"${(row.input_usuario || '').replace(/"/g, '""')}"`,
@@ -290,7 +288,7 @@ router.get('/export/pdf', async (req, res) => {
   try {
     const dataQuery = `
       SELECT 
-        r.id_regla,
+        r.id,
         r.status,
         r.fecha_creacion,
         r.input_usuario,
@@ -303,14 +301,14 @@ router.get('/export/pdf', async (req, res) => {
       FROM reglanegocio r
       LEFT JOIN (
         SELECT 
-          id_regla,
+          regla_id,
           COUNT(*) as total_simulations,
           COUNT(CASE WHEN tipo_entrada = 'text' THEN 1 END) as text_simulations,
           COUNT(CASE WHEN tipo_entrada = 'file' THEN 1 END) as file_simulations,
           MAX(fecha_simulacion) as last_simulation_date
         FROM simulacion_reglas 
-        GROUP BY id_regla
-      ) s ON r.id_regla = s.id_regla
+        GROUP BY regla_id
+      ) s ON r.id = s.regla_id
       ORDER BY r.fecha_creacion DESC
     `;
     
@@ -368,7 +366,7 @@ router.get('/export/pdf', async (req, res) => {
         // Rule header with better spacing
         doc.fontSize(14)
            .font('Helvetica-Bold')
-           .text(`${index + 1}. Regla ID: ${rule.id_regla}`, 50, doc.y, { continued: false })
+           .text(`${index + 1}. Regla ID: ${rule.id}`, 50, doc.y, { continued: false })
            .moveDown(0.3);
         
         // Rule details with consistent formatting
@@ -481,17 +479,16 @@ router.post('/filtered', async (req, res) => {
     
     let query = `
       SELECT 
-        r.id_regla,
-        r.nombre,
-        r.descripcion,
+        r.id,
         r.status,
         r.fecha_creacion,
-        r.fecha_modificacion,
-        r.creado_por,
-        COUNT(h.id) as total_executions,
-        COUNT(CASE WHEN h.resultado = 'exitoso' THEN 1 END) as successful_executions
+        r.fecha_actualizacion,
+        r.usuario_id,
+        r.resumen,
+        r.input_usuario,
+        COUNT(s.id) as total_simulations
       FROM reglanegocio r
-      LEFT JOIN historial_reglas h ON r.id_regla = h.id_regla
+      LEFT JOIN simulacion_reglas s ON r.id = s.regla_id
       WHERE 1=1
     `;
     
@@ -517,13 +514,13 @@ router.post('/filtered', async (req, res) => {
     }
     
     if (usuario_id) {
-      query += ` AND r.creado_por = $${paramIndex}`;
+      query += ` AND r.usuario_id = $${paramIndex}`;
       params.push(usuario_id);
       paramIndex++;
     }
     
     query += `
-      GROUP BY r.id_regla, r.nombre, r.descripcion, r.status, r.fecha_creacion, r.fecha_modificacion, r.creado_por
+      GROUP BY r.id, r.status, r.fecha_creacion, r.fecha_actualizacion, r.usuario_id, r.resumen, r.input_usuario
       ORDER BY r.fecha_creacion DESC
     `;
     
@@ -531,9 +528,7 @@ router.post('/filtered', async (req, res) => {
     
     const filteredData = result.rows.map(row => ({
       ...row,
-      success_rate: row.total_executions > 0 
-        ? ((row.successful_executions / row.total_executions) * 100).toFixed(2)
-        : 0
+      simulation_count: row.total_simulations || 0
     }));
 
     res.json(filteredData);

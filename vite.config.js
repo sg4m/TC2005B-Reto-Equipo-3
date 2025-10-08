@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/', // Ensure proper base path for Vercel
   build: {
     // Optimize bundle size
     rollupOptions: {
@@ -24,6 +25,9 @@ export default defineConfig({
         drop_debugger: true
       }
     },
+    // Asset handling
+    assetsDir: 'assets',
+    copyPublicDir: true,
     // Source maps for production debugging (optional)
     sourcemap: false,
     // Asset size warning threshold

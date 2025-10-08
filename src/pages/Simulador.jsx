@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
+import { rulesService } from '../services/api';
 import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
-import { useBusinessRules } from '../hooks/useBusinessRules';
 import simulationService from '../services/simulationService';
 import {
   Box, Typography, Button, IconButton,
@@ -94,8 +94,10 @@ const Simulador = () => {
   // Global notifications hook
   const { notifications, unreadCount, markAsRead, markAllAsRead, addNotification } = useGlobalNotifications();
 
-  // Business rules hook for backend data
-  const { businessRules, loading: rulesLoading, error: rulesError, refreshRules } = useBusinessRules(authService.getCurrentUser()?.id_usuario || 1);
+  // Rules management states - load ALL rules for simulation selection
+  const [businessRules, setBusinessRules] = useState([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState(null);
 
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
@@ -103,7 +105,23 @@ const Simulador = () => {
   const lastErrorRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Check authentication status on component mount
+  // Function to load all rules for simulation selection
+  const refreshRules = async () => {
+    setRulesLoading(true);
+    setRulesError(null);
+    try {
+      const rules = await rulesService.getAllRules();
+      setBusinessRules(rules || []);
+    } catch (error) {
+      console.error('Error loading rules:', error);
+      setRulesError(error.message);
+      setBusinessRules([]);
+    } finally {
+      setRulesLoading(false);
+    }
+  };
+
+  // Check authentication status and load rules on component mount
   useEffect(() => {
     //if (!authService.isAuthenticated()) {
     //goToLogin();
@@ -111,7 +129,10 @@ const Simulador = () => {
     // Welcome notifications removed - no longer needed on each page visit
     //welcomeShownRef.current = true;
     //}
-  }, [goToLogin, showSuccess]);
+    
+    // Load all rules for simulation selection
+    refreshRules();
+  }, []);
 
   // Show error if rules failed to load
   useEffect(() => {
@@ -437,7 +458,7 @@ const Simulador = () => {
       hour: '2-digit',
       minute: '2-digit'
     }) : 'No disponible',
-    userId: currentUser.id_usuario || 'N/A',
+    userId: currentUser.id || 'N/A',
     role: 'Administrador'
   } : {
     name: 'Usuario Invitado',

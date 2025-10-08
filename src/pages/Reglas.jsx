@@ -39,7 +39,8 @@ import {
   Visibility as VisibilityIcon,
   Edit as EditIcon,
   Save as SaveIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useNavigation } from '../hooks/useNavigation';
 
@@ -66,8 +67,10 @@ const Reglas = () => {
   // Global notifications hook
   const { notifications, unreadCount, markAsRead, markAllAsRead, addNotification } = useGlobalNotifications();
 
-  // Business rules hook for backend data
-  const { businessRules, loading: rulesLoading, error: rulesError, refreshRules } = useBusinessRules();
+  // Rules management states
+  const [businessRules, setBusinessRules] = useState([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState(null);
 
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
@@ -84,8 +87,28 @@ const Reglas = () => {
   const [editedRule, setEditedRule] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
+  
+  // Estado para el modal de confirmación de eliminación
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Check authentication status on component mount
+  // Function to load all rules for management
+  const refreshRules = async () => {
+    setRulesLoading(true);
+    setRulesError(null);
+    try {
+      const rules = await rulesService.getAllRules();
+      setBusinessRules(rules || []);
+    } catch (error) {
+      console.error('Error loading rules:', error);
+      setRulesError(error.message);
+      setBusinessRules([]);
+    } finally {
+      setRulesLoading(false);
+    }
+  };
+
+  // Check authentication status and load rules on component mount
   useEffect(() => {
     //if (!authService.isAuthenticated()) {
     // User is not authenticated, redirect to login
@@ -95,8 +118,9 @@ const Reglas = () => {
     //welcomeShownRef.current = true;
     //}
     
-    // Business rules are auto-loaded by the useBusinessRules hook
-  }, [goToLogin]);
+    // Load all rules for management
+    refreshRules();
+  }, []);
 
   // Auto-refresh notification timestamps every minute
   useEffect(() => {
@@ -228,6 +252,45 @@ const Reglas = () => {
     }
   };
 
+  // Funciones para eliminar regla
+  const handleDeleteClick = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      // Llamar al API para eliminar la regla
+      await rulesService.deleteRule(selectedRule.id_regla);
+      
+      // Cerrar todos los modales
+      setDeleteConfirmOpen(false);
+      setOpenModal(false);
+      setSelectedRule(null);
+      setEditedRule({});
+      setIsEditing(false);
+      
+      // Refrescar la lista de reglas
+      refreshRules();
+      
+      showSuccess('Regla eliminada exitosamente');
+      addNotification({
+        type: 'info',
+        title: 'Regla Eliminada',
+        message: `La regla ${selectedRule.id_display} ha sido eliminada del sistema`
+      });
+    } catch (error) {
+      console.error('Error deleting rule:', error);
+      showError('Error al eliminar la regla');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleProfileClose = () => {
     setProfileOpen(false);
   };
@@ -300,7 +363,7 @@ const Reglas = () => {
       hour: '2-digit',
       minute: '2-digit'
     }) : 'No disponible',
-    userId: currentUser.id_usuario || 'N/A',
+    userId: currentUser.id || 'N/A',
     role: 'Administrador'
   } : {
     name: 'Usuario Invitado',
@@ -1274,18 +1337,32 @@ const Reglas = () => {
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {!isEditing && (
-              <Tooltip title="Editar">
-                <IconButton 
-                  onClick={handleEditToggle}
-                  sx={{ 
-                    color: 'white', 
-                    bgcolor: 'rgba(255,255,255,0.1)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
-                  }}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Tooltip>
+              <>
+                <Tooltip title="Editar">
+                  <IconButton 
+                    onClick={handleEditToggle}
+                    sx={{ 
+                      color: 'white', 
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                    }}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Eliminar">
+                  <IconButton 
+                    onClick={handleDeleteClick}
+                    sx={{ 
+                      color: 'white', 
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      '&:hover': { bgcolor: 'rgba(255,0,0,0.3)' }
+                    }}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
             )}
             <IconButton 
               onClick={handleCloseModal}
@@ -1628,6 +1705,128 @@ const Reglas = () => {
               </Button>
             </Box>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={handleDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2,
+          color: '#d32f2f',
+          pb: 2
+        }}>
+          <DeleteIcon sx={{ color: '#d32f2f' }} />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Confirmar Eliminación
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
+              Esta acción no se puede deshacer
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pb: 3 }}>
+          <Box sx={{ 
+            p: 3, 
+            bgcolor: '#fff3e0', 
+            borderRadius: 2, 
+            border: '1px solid #ffb74d',
+            mb: 3
+          }}>
+            <Typography variant="body1" sx={{ color: '#e65100', fontWeight: 500, mb: 1 }}>
+              ⚠️ Advertencia
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#bf360c' }}>
+              Estás a punto de eliminar permanentemente esta regla de negocio del sistema.
+            </Typography>
+          </Box>
+          
+          <Typography variant="body1" sx={{ mb: 2, color: '#333' }}>
+            ¿Estás seguro de que deseas eliminar la siguiente regla?
+          </Typography>
+          
+          {selectedRule && (
+            <Box sx={{ 
+              p: 3, 
+              bgcolor: '#f5f5f5', 
+              borderRadius: 2, 
+              border: '1px solid #e0e0e0'
+            }}>
+              <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                <strong>ID:</strong> {selectedRule.id_display}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                <strong>Usuario:</strong> {selectedRule.usuario}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                <strong>Empresa:</strong> {selectedRule.empresa}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                <strong>Descripción:</strong> {selectedRule.descripcion?.substring(0, 100)}...
+              </Typography>
+            </Box>
+          )}
+          
+          <Typography variant="body2" sx={{ mt: 3, color: '#666', fontStyle: 'italic' }}>
+            Esta regla será eliminada de la base de datos y no podrá ser recuperada.
+          </Typography>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          gap: 2, 
+          borderTop: '1px solid #e0e0e0' 
+        }}>
+          <Button
+            onClick={handleDeleteCancel}
+            disabled={isDeleting}
+            variant="outlined"
+            sx={{
+              color: '#666',
+              borderColor: '#ccc',
+              px: 3,
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                borderColor: '#999'
+              }
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            disabled={isDeleting}
+            variant="contained"
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
+            sx={{
+              bgcolor: '#d32f2f',
+              px: 3,
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: '#b71c1c'
+              },
+              '&:disabled': {
+                bgcolor: '#ffcdd2',
+                color: '#666'
+              }
+            }}
+          >
+            {isDeleting ? 'Eliminando...' : 'Eliminar Regla'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
