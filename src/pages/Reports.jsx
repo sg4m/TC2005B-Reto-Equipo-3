@@ -4,6 +4,15 @@ import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import { useReports } from '../hooks/useReports';
 import { useBusinessRules } from '../hooks/useBusinessRules';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+} from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+
+ChartJS.register(ArcElement, ChartTooltip, ChartLegend);
 
 // Suppress MUI Grid deprecation warnings during development
 console.warn = function(message) {
@@ -773,17 +782,16 @@ const Reports = () => {
           </Grid>
           )}
 
-          {/* Detailed Information Cards */}
-          <Grid container spacing={3}>
-
-
-            {/* Recent Rules Activity */}
-            <Grid item xs={12} md={6}>
+          {/* Three Column Layout - Recent Activity, Chart, Statistics */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            {/* Recent Rules Activity - LEFT */}
+            <Grid item xs={12} md={4}>
               <Card sx={{ 
                 backgroundColor: 'white',
                 border: '1px solid #e0e0e0',
                 borderRadius: '12px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                height: '450px'
               }}>
                 <CardContent sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
@@ -801,7 +809,7 @@ const Reports = () => {
                     </IconButton>
                   </Box>
 
-                  <Box sx={{ overflow: 'auto', maxHeight: '300px' }}>
+                  <Box sx={{ overflow: 'auto', maxHeight: '350px' }}>
                     {movementsLoading ? (
                       <Box sx={{ py: 4 }}>
                         <LinearProgress />
@@ -842,6 +850,225 @@ const Reports = () => {
                 </CardContent>
               </Card>
             </Grid>
+
+            {/* Chart Section - MIDDLE */}
+            {!loading && reportsData && Object.keys(reportsData).length > 0 && (
+              <Grid item xs={12} md={4}>
+                <Card sx={{ 
+                  backgroundColor: 'white',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  height: '450px'
+                }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Typography variant="h6" sx={{ 
+                      fontWeight: 600, 
+                      color: '#333',
+                      mb: 3,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <AssessmentIcon sx={{ mr: 1, color: '#EB0029' }} />
+                      Distribución de Reglas
+                    </Typography>
+                    
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      height: '350px'
+                    }}>
+                      <Pie
+                        data={{
+                          labels: ['Reglas Activas', 'Reglas Inactivas', 'Reglas Simuladas'],
+                          datasets: [
+                            {
+                              data: [
+                                reportsData.activeRules || 0,
+                                reportsData.inactiveRules || 0,
+                                reportsData.simulationRules || 0
+                              ],
+                              backgroundColor: [
+                                '#4caf50', // Green for active rules
+                                '#ff9800', // Orange for inactive rules  
+                                '#2196f3'  // Blue for simulation rules
+                              ],
+                              borderColor: [
+                                '#4caf50',
+                                '#ff9800',
+                                '#2196f3'
+                              ],
+                              borderWidth: 2,
+                              hoverBackgroundColor: [
+                                '#66bb6a',
+                                '#ffb74d',
+                                '#42a5f5'
+                              ],
+                              hoverBorderColor: [
+                                '#388e3c',
+                                '#f57c00',
+                                '#1976d2'
+                              ]
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'bottom',
+                              labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                font: {
+                                  size: 11
+                                }
+                              }
+                            },
+                            tooltip: {
+                              callbacks: {
+                                label: function(context) {
+                                  const label = context.label || '';
+                                  const value = context.parsed;
+                                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                  const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                  return `${label}: ${value} (${percentage}%)`;
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Statistics Summary Card - RIGHT */}
+            {!loading && reportsData && Object.keys(reportsData).length > 0 && (
+              <Grid item xs={12} md={4}>
+                <Card sx={{ 
+                  backgroundColor: 'white',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  height: '450px'
+                }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Typography variant="h6" sx={{ 
+                      fontWeight: 600, 
+                      color: '#333',
+                      mb: 3,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      <TrendingUpIcon sx={{ mr: 1, color: '#EB0029' }} />
+                      Resumen Estadístico
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        p: 2,
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            borderRadius: '50%', 
+                            backgroundColor: '#4caf50', 
+                            mr: 2 
+                          }} />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            Reglas Activas
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#4caf50' }}>
+                          {reportsData.activeRules || 0}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        p: 2,
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            borderRadius: '50%', 
+                            backgroundColor: '#ff9800', 
+                            mr: 2 
+                          }} />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            Reglas Inactivas
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#ff9800' }}>
+                          {reportsData.inactiveRules || 0}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        p: 2,
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            borderRadius: '50%', 
+                            backgroundColor: '#2196f3', 
+                            mr: 2 
+                          }} />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            Reglas Simuladas
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#2196f3' }}>
+                          {reportsData.simulationRules || 0}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ 
+                        mt: 2, 
+                        pt: 2, 
+                        borderTop: '1px solid #e0e0e0',
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center' 
+                      }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#333' }}>
+                          Total de Reglas
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700, color: '#EB0029' }}>
+                          {(reportsData.activeRules || 0) + (reportsData.inactiveRules || 0) + (reportsData.simulationRules || 0)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+
+          {/* Additional Information Cards */}
+          <Grid container spacing={3}>
          </Grid>
         </Box>
       </Box>
