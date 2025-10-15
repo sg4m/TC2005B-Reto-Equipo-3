@@ -69,6 +69,42 @@ router.post('/continue-conversation', async (req, res) => {
   }
 });
 
+// Process payment file with ISO 20022 PAIN.001 mapping rules
+router.post('/process-payment-mapping', async (req, res) => {
+  try {
+    const { fileContent, fileType, fileName } = req.body;
+    
+    if (!fileContent) {
+      return res.status(400).json({ 
+        error: 'Contenido del archivo es requerido' 
+      });
+    }
+
+    if (!fileType || !['txt', 'xml'].includes(fileType.toLowerCase())) {
+      return res.status(400).json({ 
+        error: 'Tipo de archivo debe ser TXT o XML' 
+      });
+    }
+
+    console.log(`Procesando archivo de pago: ${fileName || 'sin nombre'} (${fileType})`);
+    
+    const result = await geminiService.processPaymentMapping(fileContent, fileType);
+    
+    res.json({
+      success: true,
+      fileName: fileName || 'archivo_pago',
+      fileType: fileType,
+      mapping_result: result
+    });
+
+  } catch (error) {
+    console.error('Error processing payment mapping:', error);
+    res.status(500).json({ 
+      error: 'Error al procesar mapeo de pagos: ' + error.message 
+    });
+  }
+});
+
 // Get Gemini model info
 router.get('/gemini-info', (req, res) => {
   res.json({
@@ -78,7 +114,8 @@ router.get('/gemini-info', (req, res) => {
       'Generación de reglas de negocio desde texto',
       'Análisis de datos CSV',
       'Refinamiento de reglas existentes',
-      'Conversación iterativa para refinar requerimientos'
+      'Conversación iterativa para refinar requerimientos',
+      'Procesamiento de archivos de pago con mapeo ISO 20022 PAIN.001'
     ],
     api_key_configured: !!process.env.GEMINI_API_KEY
   });

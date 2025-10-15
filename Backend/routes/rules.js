@@ -185,6 +185,110 @@ router.post('/generate', upload.single('archivo'), async (req, res) => {
   }
 });
 
+// Generate mapped payment rule (TXT/XML -> pain.001) and store JSON result
+router.post('/generate-mapped', async (req, res) => {
+  try {
+    const { usuario_id, descripcion, fileContent, fileType, fileName } = req.body;
+
+    console.log('[generate-mapped] Solicitud recibida:', { 
+      usuario_id, 
+      descripcion, 
+      fileName, 
+      fileType,
+      contentLength: fileContent?.length 
+    });
+
+    if (!usuario_id || !fileContent || !fileType) {
+      return res.status(400).json({
+        error: 'usuario_id, fileContent y fileType son requeridos'
+      });
+    }
+
+    try {
+      // Call AI mapping service (generic TXT/XML input)
+      console.log('[generate-mapped] Llamando a processPaymentMapping...');
+      const mapping = await geminiService.processPaymentMapping(fileContent, fileType);
+      console.log('[generate-mapped] Mapeo completado:', { 
+        is_valid: mapping?.validation?.is_valid,
+        has_xml: !!mapping?.pain001_xml,
+        summary: mapping?.summary 
+      });
+
+      // Build summary and inputs
+      const aiSummary = mapping?.summary || 'Mapeo de pago generado por IA';
+      const userInput = (descripcion ? `${descripcion} ` : '') + `(Archivo: ${fileName || 'contenido_enviado'})`;
+
+      // Persist in reglanegocio keeping same structure
+      const result = await db.query(
+        'INSERT INTO reglanegocio (usuario_id, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [
+          usuario_id,
+          'Activa',
+          userInput.trim(),         // input_usuario
+          aiSummary,                // resumen
+          null,                     // archivo_original (no guardamos físicamente)
+          JSON.stringify(mapping)   // regla_estandarizada (JSON filtrable)
+        ]
+      );
+
+      console.log('[generate-mapped] Regla guardada exitosamente, ID:', result.rows[0].id);
+
+      res.status(201).json({
+        message: 'Mapeo de pago generado y almacenado exitosamente',
+        regla: {
+          ...result.rows[0],
+          regla_estandarizada: mapping
+        },
+        mapping_result: mapping
+      });
+
+    } catch (mappingError) {
+      console.error('[generate-mapped] Error en mapeo:', mappingError);
+      
+      // Store error in database for user to see
+      const errorMapping = {
+        validation: {
+          is_valid: false,
+          errors: [mappingError.message || 'Error desconocido en el procesamiento'],
+          warnings: []
+        },
+        mapped_fields: {},
+        pain001_xml: "",
+        summary: "Error al procesar el archivo de pago",
+        processing_notes: `Error técnico: ${mappingError.message}`
+      };
+
+      const userInput = (descripcion ? `${descripcion} ` : '') + `(Archivo: ${fileName || 'contenido_enviado'})`;
+      
+      const result = await db.query(
+        'INSERT INTO reglanegocio (usuario_id, status, input_usuario, resumen, archivo_original, regla_estandarizada) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [
+          usuario_id,
+          'Inactiva',
+          userInput.trim(),
+          'Error al procesar el archivo de pago',
+          null,
+          JSON.stringify(errorMapping)
+        ]
+      );
+
+      res.status(201).json({
+        message: 'Regla guardada con error de procesamiento',
+        regla: {
+          ...result.rows[0],
+          regla_estandarizada: errorMapping
+        },
+        mapping_result: errorMapping,
+        error: mappingError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('[generate-mapped] Error general:', error);
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+  }
+});
+
 // Get user's business rules
 router.get('/user/:id_usuario', async (req, res) => {
   try {
@@ -355,6 +459,7 @@ router.get('/list', async (req, res) => {
         fecha_creacion: row.fecha_creacion,
         status: row.status || 'N/A',
         descripcion: row.resumen || row.input_usuario || 'Sin descripción',
+        regla_estandarizada: row.regla_estandarizada || null,
         // Format ID for display
         id_display: `REG-${String(row.id).padStart(4, '0')}`,
         // Include additional metadata fields if they exist

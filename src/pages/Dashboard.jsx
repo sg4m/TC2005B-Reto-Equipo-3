@@ -38,7 +38,7 @@ import {
 import { useNavigation } from '../hooks/useNavigation';
 import { useBusinessRules } from '../hooks/useBusinessRules';
 import { useConversation } from '../hooks/useConversation';
-import { aiService } from '../services/api';
+import { aiService, rulesService } from '../services/api';
 
 const Dashboard = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -58,6 +58,8 @@ const Dashboard = () => {
   
   // File upload states
   const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState('');
+  const [fileValidated, setFileValidated] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   
   // UI states - removed snackbar as we're using useNotification hook
@@ -267,9 +269,48 @@ const Dashboard = () => {
         .map(msg => msg.content)
         .join('\n')}`;
 
+      // Si hay archivo TXT/XML, usar mapeo y guardado automático
+      if (selectedFile) {
+        const name = selectedFile.name.toLowerCase();
+        const isTxt = name.endsWith('.txt');
+        const isXml = name.endsWith('.xml');
+        if (isTxt || isXml) {
+          const user = authService.getCurrentUser?.();
+          if (!user?.id) {
+            showError('No hay usuario autenticado. Inicia sesión nuevamente.');
+            return goToLogin();
+          }
+          const fileContent = await selectedFile.text();
+          const fileType = isXml ? 'xml' : 'txt';
+          await rulesService.generateMappedRule({
+            usuario_id: user.id,
+            descripcion: summary?.summary || 'Mapeo generado desde conversación con IA',
+            fileContent,
+            fileType,
+            fileName: selectedFile.name
+          });
+
+          addNotification({
+            type: 'success',
+            title: 'Regla Creada',
+            message: `Mapeo generado y guardado desde conversación (${selectedFile.name})`
+          });
+          showSuccess('¡Mapeo generado y guardado exitosamente!');
+
+          await loadMovements();
+          // Reset conversación y navegar a Reglas
+          resetConversation();
+          setConversationMode(false);
+          setPromptText('');
+          setSelectedFile(null);
+          return goToReglas();
+        }
+      }
+
+      // Fallback: generación tradicional sin archivo de mapeo
       await generateRule({
         prompt_texto: finalPrompt,
-        archivo: selectedFile,
+        archivo: null,
         descripcion: summary?.summary || 'Regla generada desde conversación con IA'
       });
 
@@ -301,6 +342,8 @@ const Dashboard = () => {
     }
   };
 
+  const [isFileGenerating, setIsFileGenerating] = useState(false);
+
   const handlePromptSubmit = async () => {
     if (!promptText.trim() && !selectedFile) {
       showWarning('Escribe un prompt o sube un archivo para generar una regla');
@@ -313,22 +356,64 @@ const Dashboard = () => {
     }
 
     try {
+      setIsFileGenerating(true);
+      // Si hay archivo TXT/XML, usar el flujo de mapeo y guardado automático
+      if (selectedFile) {
+        const name = selectedFile.name.toLowerCase();
+        const isTxt = name.endsWith('.txt');
+        const isXml = name.endsWith('.xml');
+        if (isTxt || isXml) {
+          const user = authService.getCurrentUser?.();
+          if (!user?.id) {
+            showError('No hay usuario autenticado. Inicia sesión nuevamente.');
+            setIsFileGenerating(false);
+            return goToLogin();
+          }
+
+          const fileContent = await selectedFile.text();
+          const fileType = isXml ? 'xml' : 'txt';
+          try {
+            await rulesService.generateMappedRule({
+              usuario_id: user.id,
+              descripcion: promptText.trim() || `Mapeo desde ${selectedFile.name}`,
+              fileContent,
+              fileType,
+              fileName: selectedFile.name
+            });
+            addNotification({
+              type: 'success',
+              title: 'Regla Creada',
+              message: `Mapeo generado y guardado desde ${selectedFile.name}`
+            });
+            showSuccess('¡Mapeo generado y guardado exitosamente!');
+            await loadMovements();
+            setPromptText('');
+            setSelectedFile(null);
+            setIsFileGenerating(false);
+            return goToReglas();
+          } catch (err) {
+            showError('Error al generar la regla. Intenta nuevamente.');
+            setIsFileGenerating(false);
+            return;
+          }
+        }
+      }
+
+      // Fallback: generación tradicional (solo prompt)
       await generateRule({
         prompt_texto: promptText.trim(),
-        archivo: selectedFile,
-        descripcion: promptText.trim() || 'Regla generada desde archivo'
+        archivo: null,
+        descripcion: promptText.trim() || 'Regla generada desde prompt'
       });
-
-      // Add notification for successful rule generation
       addNotification({
         type: 'success',
         title: 'Regla Creada',
-        message: `Nueva regla de negocio generada: ${promptText.trim() || 'desde archivo'}`
+        message: `Nueva regla de negocio generada: ${promptText.trim() || 'desde prompt'}`
       });
-
       showSuccess('¡Regla de negocio generada exitosamente!');
       setPromptText('');
       setSelectedFile(null);
+      setIsFileGenerating(false);
     } catch (err) {
       console.error('Error generating rule:', err);
       
@@ -459,14 +544,14 @@ const Dashboard = () => {
     validateAndSetFile(file);
   };
 
-  const validateAndSetFile = (file) => {
+  const validateAndSetFile = async (file) => {
     if (!file) return;
 
-    const allowedTypes = ['text/csv', 'application/vnd.ms-excel'];
+    const allowedTypes = ['text/plain', 'text/xml', 'application/xml'];
     const fileExtension = file.name.toLowerCase();
-    
-    if (!allowedTypes.includes(file.type) && !fileExtension.endsWith('.csv')) {
-      showError('Solo se permiten archivos CSV');
+
+    if (!allowedTypes.includes(file.type) && !fileExtension.endsWith('.txt') && !fileExtension.endsWith('.xml')) {
+      showError('Solo se permiten archivos TXT o XML');
       return;
     }
 
@@ -476,11 +561,25 @@ const Dashboard = () => {
     }
 
     setSelectedFile(file);
+    setFileValidated(false);
+    // Leer preview (primeros 1KB o 10 líneas)
+    try {
+      const text = await file.text();
+      let preview = text;
+      if (text.length > 1024) preview = text.slice(0, 1024) + '\n...';
+      const lines = preview.split(/\r?\n/);
+      if (lines.length > 10) preview = lines.slice(0, 10).join('\n') + '\n...';
+      setFilePreview(preview);
+    } catch (e) {
+      setFilePreview('Error al leer el archivo');
+    }
     showSuccess(`Archivo "${file.name}" seleccionado`);
   };
 
   const handleFileRemove = () => {
     setSelectedFile(null);
+    setFilePreview('');
+    setFileValidated(false);
   };
 
   const handleDragOver = (event) => {
@@ -1183,7 +1282,7 @@ const Dashboard = () => {
                       Bienvenido al Generador IA
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#bbb' }}>
-                      Escribe un prompt o sube un archivo CSV para generar reglas de negocio
+                      Escribe un prompt o sube un archivo TXT o XML para generar reglas de negocio
                     </Typography>
                   </Box>
                 </Box>
@@ -1248,20 +1347,45 @@ const Dashboard = () => {
               {!conversationMode && selectedFile ? (
                 <Box sx={{ 
                   display: 'flex', 
-                  alignItems: 'center', 
                   gap: 2, 
                   mb: 2,
                   p: 2,
                   backgroundColor: 'rgba(235, 0, 41, 0.1)',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  flexDirection: 'column'
                 }}>
-                  <AttachFileIcon sx={{ color: '#EB0029' }} />
-                  <Typography sx={{ flex: 1, fontSize: '14px' }}>
-                    {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </Typography>
-                  <IconButton size="small" onClick={handleFileRemove}>
-                    <DeleteIcon />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <AttachFileIcon sx={{ color: '#EB0029' }} />
+                    <Typography sx={{ flex: 1, fontSize: '14px' }}>
+                      {selectedFile.name} ({selectedFile.size < 1024 * 1024
+                        ? `${(selectedFile.size / 1024).toFixed(1)} KB`
+                        : `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`})
+                    </Typography>
+                    <IconButton size="small" onClick={handleFileRemove}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                  <Box sx={{ mt: 1, mb: 1, p: 1, backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', color: '#333', whiteSpace: 'pre-wrap', maxHeight: '120px', overflowY: 'auto' }}>
+                    <strong>Vista previa:</strong>
+                    <br />
+                    {filePreview}
+                  </Box>
+                  {!fileValidated && (
+                    <Button variant="outlined" color="success" size="small" sx={{ alignSelf: 'flex-end', mb: 1 }} onClick={() => {
+                      if (!selectedFile) return;
+                      if (selectedFile.size === 0) {
+                        showError('El archivo está vacío');
+                        return;
+                      }
+                      setFileValidated(true);
+                      showSuccess('Archivo validado correctamente');
+                    }}>
+                      Validar archivo
+                    </Button>
+                  )}
+                  {fileValidated && (
+                    <Chip label="Archivo validado" color="success" size="small" sx={{ alignSelf: 'flex-end', mb: 1 }} />
+                  )}
                 </Box>
               ) : (
                 <Box 
@@ -1281,7 +1405,7 @@ const Dashboard = () => {
                 >
                   <CloudUploadIcon sx={{ fontSize: '32px', color: dragOver ? '#EB0029' : '#999', mb: 1 }} />
                   <Typography sx={{ fontSize: '14px', color: '#666' }}>
-                    Arrastra un archivo CSV o haz clic para seleccionar
+                    Arrastra un archivo TXT o XML o haz clic para seleccionar
                   </Typography>
                 </Box>
               )}
@@ -1290,7 +1414,7 @@ const Dashboard = () => {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept=".csv"
+                accept=".txt,.xml"
                 style={{ display: 'none' }}
               />
 
@@ -1325,19 +1449,27 @@ const Dashboard = () => {
                 />
                 <Button 
                   onClick={handlePromptSubmit}
-                  disabled={isGenerating || isConversationActive || (!promptText.trim() && !selectedFile)}
+                  disabled={isGenerating || isFileGenerating || isConversationActive || (!promptText.trim() && !selectedFile) || (selectedFile && !fileValidated)}
                   variant="contained"
                   sx={{ 
-                    backgroundColor: (!isGenerating && !isConversationActive && (promptText.trim() || selectedFile)) ? '#EB0029' : '#ccc',
+                    backgroundColor: (!isGenerating && !isFileGenerating && !isConversationActive && (promptText.trim() || selectedFile) && (!selectedFile || fileValidated)) ? '#EB0029' : '#ccc',
                     color: 'white',
                     minWidth: '120px',
                     '&:hover': {
-                      backgroundColor: (!isGenerating && !isConversationActive && (promptText.trim() || selectedFile)) ? '#D32F2F' : '#ccc',
+                      backgroundColor: (!isGenerating && !isFileGenerating && !isConversationActive && (promptText.trim() || selectedFile) && (!selectedFile || fileValidated)) ? '#D32F2F' : '#ccc',
                     }
                   }}
                 >
-                  {conversationMode ? 'Iniciar Chat' : 'Generar'}
+                  {isFileGenerating ? 'Generando regla...' : (conversationMode ? 'Iniciar Chat' : 'Generar')}
                 </Button>
+                {isFileGenerating && (
+                  <Box sx={{ mt: 2, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LinearProgress sx={{ flex: 1 }} />
+                    <Typography sx={{ color: '#666', fontSize: '13px', ml: 2 }}>
+                      Generando regla de negocio con IA...
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </Box>
               </CardContent>

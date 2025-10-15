@@ -81,6 +81,22 @@ export const rulesService = {
     }
   },
 
+  // Generate mapped payment (TXT/XML -> JSON envelope with pain001_xml) and store it
+  async generateMappedRule({ usuario_id, descripcion, fileContent, fileType, fileName }) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/rules/generate-mapped`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ usuario_id, descripcion, fileContent, fileType, fileName }),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
+
   // Get user's business rules
   async getUserRules(usuarioId) {
     try {
@@ -205,6 +221,22 @@ export const aiService = {
           message, 
           conversationHistory 
         }),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  },
+
+  // Process generic TXT/XML content with mapping rules to produce payment XML
+  async processPaymentMapping({ fileContent, fileType, fileName }) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/process-payment-mapping`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileContent, fileType, fileName }),
       });
       return await handleResponse(response);
     } catch (error) {

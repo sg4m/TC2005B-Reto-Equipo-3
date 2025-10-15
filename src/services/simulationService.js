@@ -86,6 +86,31 @@ export const simulationService = {
       handleNetworkError(error);
     }
   }
+
+,
+
+
+
+
+  // Save simulation (persist AI response returned to frontend)
+  async saveSimulation({ ruleId, inputType, inputData, fileName, aiResponse }) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/simulation/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rule_id: ruleId,
+          input_type: inputType,
+          input_data: inputData,
+          file_name: fileName,
+          ai_response: aiResponse
+        })
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      handleNetworkError(error);
+    }
+  }
 };
 
 export default simulationService;

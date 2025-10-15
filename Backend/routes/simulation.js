@@ -318,4 +318,35 @@ router.get('/details/:simulation_id', async (req, res) => {
   }
 });
 
+// Save simulation result (used when frontend obtains AI response separately)
+router.post('/save', async (req, res) => {
+  try {
+    const { rule_id, input_type, input_data, file_name, ai_response } = req.body;
+
+    if (!rule_id || !input_type || ai_response === undefined) {
+      return res.status(400).json({ error: 'rule_id, input_type y ai_response son requeridos' });
+    }
+
+    const result = await db.query(
+      'INSERT INTO simulacion_reglas (regla_id, tipo_entrada, datos_entrada, archivo_original, resultado_ia, fecha_simulacion) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING *',
+      [
+        rule_id,
+        input_type,
+        input_data ? (typeof input_data === 'string' ? input_data : JSON.stringify(input_data)) : null,
+        file_name || null,
+        JSON.stringify(ai_response)
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Simulación guardada exitosamente',
+      simulation_id: result.rows[0].id,
+      simulation: result.rows[0]
+    });
+  } catch (error) {
+    console.error('[save simulation] Error:', error);
+    res.status(500).json({ error: 'Error interno al guardar la simulación: ' + error.message });
+  }
+});
+
 module.exports = router;

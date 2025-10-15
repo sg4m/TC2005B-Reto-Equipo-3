@@ -55,7 +55,7 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
 
             // Try to parse JSON from the response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -90,108 +90,96 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
     }
 
     /**
-     * Analyze CSV data and generate business rules
-     * @param {Array} csvData - Parsed CSV data array
-     * @param {string} context - Additional context about the data
-     * @returns {Promise<Object>} Generated business rules based on data analysis
+     * Process payment file and apply Banorte business mapping rules
+     * @param {string} fileContent - Content of the file (TXT or XML)
+     * @param {string} fileType - Type of file (txt or xml)
+     * @returns {Promise<Object>} Mapped payment data with validation results
      */
-    async generateBusinessRulesFromData(csvData, context = '') {
+    async processPaymentMapping(fileContent, fileType) {
         try {
-            // Analyze the CSV structure
-            const headers = csvData.length > 0 ? Object.keys(csvData[0]) : [];
-            const rowCount = csvData.length;
-            const sample = csvData.slice(0, 3); // First 3 rows as sample
+            console.log(`[processPaymentMapping] Iniciando procesamiento de archivo tipo: ${fileType}`);
+            console.log(`[processPaymentMapping] Tamaño del contenido: ${fileContent ? fileContent.length : 0} caracteres`);
 
-            const systemPrompt = `
-Eres un experto en reglas de negocio para el banco Banorte. Analiza los datos CSV proporcionados y genera reglas de negocio relevantes.
+            // Construir prompt que pide SOLO el XML mapeado
+            const systemPrompt = `Eres un experto en procesamiento de pagos bancarios para Banorte.
 
-Análisis de Datos CSV:
-- Encabezados: ${headers.join(', ')}
-- Número de filas: ${rowCount}
-- Datos de muestra: ${JSON.stringify(sample, null, 2)}
-- Contexto: ${context}
+TAREA: A partir del archivo de entrada proporcionado, extrae los campos necesarios y genera ÚNICAMENTE un XML mapeado con la siguiente estructura:
 
-Por favor genera reglas de negocio que puedan aplicarse a estos datos para operaciones bancarias. Considera:
-- Reglas de validación de datos
-- Reglas de evaluación de riesgo
-- Requerimientos de cumplimiento normativo
-- Patrones de detección de fraude
-- Reglas de segmentación de clientes
-- Límites o umbrales de transacciones
+<MappedPayment>
+  <OPERACION>...</OPERACION>
+  <CTA_ORIGENOR>...</CTA_ORIGENOR>
+  <CTA_DESTINO>...</CTA_DESTINO>
+  <IMPORTE>...</IMPORTE>
+  <REFERENCIA>...</REFERENCIA>
+  <DESCRIPCION>...</DESCRIPCION>
+  <FECHA_APLICACION>...</FECHA_APLICACION>
+</MappedPayment>
 
-Formatea tu respuesta como JSON:
-{
-    "data_analysis": {
-        "data_type": "tipo de datos detectado (transacciones, clientes, etc.)",
-        "key_insights": ["conocimiento 1", "conocimiento 2"],
-        "data_quality": "evaluación de la calidad de los datos"
-    },
-    "rules": [
-        {
-            "id": "regla_001",
-            "title": "Título de la Regla",
-            "description": "Descripción detallada",
-            "conditions": ["condición basada en datos"],
-            "actions": ["acción recomendada"],
-            "priority": "alta|media|baja",
-            "category": "deteccion_fraude|cumplimiento|gestion_riesgo|servicio_cliente|validacion_datos",
-            "data_fields": ["columnas CSV relevantes"]
-        }
-    ],
-    "summary": "Resumen de las reglas generadas",
-    "implementation_notes": "Consideraciones de implementación"
-}
-IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, análisis y descripciones.
+Reglas resumen:
+- OPERACION: 2 dígitos según tipo de cuenta destino y fecha (02,04,05 según reglas de Banorte).
+- CTA_ORIGENOR: 20 dígitos, justificar derecha con ceros.
+- CTA_DESTINO: 20 dígitos; si origen es Cheques (10) construir CLABE según reglas; si CLABE 072/032 aplicar extracción indicada; otherwise rellenar con ceros a la derecha hasta 20.
+- IMPORTE: 14 dígitos (12 enteros + 2 decimales), justificar derecha con ceros.
+- REFERENCIA: 10 dígitos, recortar si excede.
+- DESCRIPCION: 30 caracteres, justificar a la izquierda.
+- FECHA_APLICACION: DDMMAAAA, no menor a la fecha actual.
+
+INSTRUCCIONES IMPORTANTES:
+1) NO agregues texto adicional ni explicaciones.
+2) Responde solo con el XML mostrado arriba. Si algún campo no existe, deja la etiqueta vacía (ej. <DESCRIPCION></DESCRIPCION>).
+3) Si el modelo no puede encontrar datos, aún así devuelve el XML con campos vacíos.
+
+ARCHIVO_DE_ENTRADA:
+${fileContent}
 `;
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
 
-            // Try to parse JSON from the response
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                try {
-                    return JSON.parse(jsonMatch[0]);
-                } catch (parseError) {
-                    console.warn('Warning: AI returned malformed JSON for generateBusinessRulesFromPrompt, falling back. Parse error:', parseError.message);
-                    // fallback
-                }
+            // Extraer contenido XML si viene en code block
+            let xml = (text || '').trim();
+            const codeBlockMatch = xml.match(/```(?:xml)?\n([\s\S]*?)```/i);
+            if (codeBlockMatch) xml = codeBlockMatch[1].trim();
+
+            // Si la respuesta parece ser JSON en vez de XML, devolver fallback con el texto completo
+            if (xml.startsWith('{') || xml.startsWith('[')) {
+                console.error('[processPaymentMapping] Gemini devolvió JSON en lugar de XML');
+                return {
+                    xml: '',
+                    validation: {
+                        is_valid: false,
+                        errors: ['Gemini devolvió JSON en lugar de XML'],
+                        warnings: []
+                    },
+                    processing_notes: `Respuesta de Gemini (primeros 1000 chars): ${text.substring(0,1000)}`
+                };
             }
 
-            // Fallback response
+            // Validación básica de presencia de campos
+            const requiredFields = ['OPERACION','CTA_ORIGENOR','CTA_DESTINO','IMPORTE','REFERENCIA','DESCRIPCION','FECHA_APLICACION'];
+            const missing = requiredFields.filter(f => !new RegExp(`<${f}>[\s\S]*?<\/${f}>`).test(xml));
+            const is_valid = xml.startsWith('<') && missing.length === 0;
+
             return {
-                data_analysis: {
-                    data_type: "Desconocido",
-                    key_insights: ["Datos cargados exitosamente"],
-                    data_quality: "Requiere revisión"
+                xml,
+                validation: {
+                    is_valid,
+                    errors: is_valid ? [] : (missing.length ? [`Faltan etiquetas: ${missing.join(', ')}`] : ['XML generado no válido']),
+                    warnings: []
                 },
-                rules: [{
-                    id: "regla_001",
-                    title: "Regla de Revisión de Datos",
-                    description: "Revisar datos cargados para la generación de reglas de negocio",
-                    conditions: [`Los datos tienen ${rowCount} filas`, `Encabezados: ${headers.join(', ')}`],
-                    actions: ["Revisión manual requerida"],
-                    priority: "media",
-                    category: "validacion_datos",
-                    data_fields: headers
-                }],
-                summary: "Análisis inicial de datos completado",
-                implementation_notes: "Se recomienda revisión manual para generación precisa de reglas"
+                processing_notes: `Respuesta de Gemini (primeros 1000 chars): ${text.substring(0,1000)}`
             };
 
         } catch (error) {
-            console.error('Error generando reglas de negocio desde datos:', error);
-            throw new Error('Error al analizar datos y generar reglas: ' + error.message);
+            console.error('[processPaymentMapping] Error en el proceso:', error);
+            return {
+                xml: '',
+                validation: { is_valid: false, errors: [error.message || 'Error desconocido'], warnings: [] },
+                processing_notes: `Error interno: ${error.message}`
+            };
         }
     }
-
-    /**
-     * Refine existing business rules based on feedback
-     * @param {Object} existingRules - Current business rules
-     * @param {string} feedback - User feedback or modification request
-     * @returns {Promise<Object>} Refined business rules
-     */
     async refineBusinessRules(existingRules, feedback) {
         try {
             const systemPrompt = `
@@ -208,7 +196,7 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
 
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
@@ -272,7 +260,7 @@ RESPONDE ÚNICAMENTE en español y mantén un tono profesional pero amigable.
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
 
             // Try to parse JSON from the response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -332,8 +320,8 @@ Responde ÚNICAMENTE con el resumen, sin formato JSON ni texto adicional.
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text().trim();
-            
+            const text = ((await response.text()) || '').trim();
+
             return text;
 
         } catch (error) {
@@ -416,7 +404,7 @@ IMPORTANTE:
 
             const result = await this.model.generateContent(systemPrompt);
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
 
             // Try to parse JSON from the response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -461,7 +449,7 @@ IMPORTANTE:
             // Try a simple generation to test connectivity
             const result = await this.model.generateContent('Responde solo con "OK" si recibes este mensaje');
             const response = await result.response;
-            const text = response.text();
+            const text = (await response.text()) || '';
             
             return {
                 status: 'success',

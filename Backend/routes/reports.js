@@ -295,16 +295,32 @@ router.get('/export/csv', async (req, res) => {
     // Create CSV content with simulation data
     const csvHeader = 'ID Regla,Estado,Fecha Creacion,Input Usuario,Resumen,Archivo Original,Regla Estandarizada,Total Simulaciones,Simulaciones Texto,Simulaciones Archivo,Ultima Simulacion\n';
     const csvContent = result.rows.map(row => {
-      const reglaEstandarizada = row.regla_estandarizada ? String(row.regla_estandarizada).substring(0, 100) : '';
+      // Prepare regla_estandarizada: stringify if object, otherwise keep string
+      let reglaEstandarizadaRaw = '';
+      try {
+        if (row.regla_estandarizada === null || row.regla_estandarizada === undefined) {
+          reglaEstandarizadaRaw = '';
+        } else if (typeof row.regla_estandarizada === 'object') {
+          reglaEstandarizadaRaw = JSON.stringify(row.regla_estandarizada);
+        } else {
+          reglaEstandarizadaRaw = String(row.regla_estandarizada);
+        }
+      } catch (e) {
+        reglaEstandarizadaRaw = String(row.regla_estandarizada || '');
+      }
+
+      // Collapse newlines and escape double quotes for CSV safety
+      const reglaEstandarizadaSafe = reglaEstandarizadaRaw.replace(/\r?\n/g, ' ').replace(/"/g, '""');
       const ultimaSimulacion = row.ultima_simulacion ? new Date(row.ultima_simulacion).toISOString().split('T')[0] : 'N/A';
+
       return [
         row.id || '',
         row.status || '',
         row.fecha_creacion ? new Date(row.fecha_creacion).toISOString().split('T')[0] : '',
-        `"${(row.input_usuario || '').replace(/"/g, '""')}"`,
-        `"${(row.resumen || '').replace(/"/g, '""')}"`,
-        `"${(row.archivo_original || '').replace(/"/g, '""')}"`,
-        `"${reglaEstandarizada.replace(/"/g, '""')}..."`,
+        `"${(row.input_usuario || '').replace(/"/g, '""') }"`,
+        `"${(row.resumen || '').replace(/"/g, '""') }"`,
+        `"${(row.archivo_original || '').replace(/"/g, '""') }"`,
+        `"${reglaEstandarizadaSafe}"`,
         row.total_simulaciones || 0,
         row.simulaciones_texto || 0,
         row.simulaciones_archivo || 0,
@@ -464,7 +480,37 @@ router.get('/export/pdf', async (req, res) => {
           currentY = doc.y + 5;
         }
         
-        if (rule.resumen) {
+        // Prefer printing the full generated rule from Gemini (regla_estandarizada).
+        // If not available, fallback to the resumen field.
+        if (rule.regla_estandarizada) {
+          let reglaText = '';
+          try {
+            // If stored as JSON object in DB, pretty-print it
+            if (typeof rule.regla_estandarizada === 'object') {
+              reglaText = JSON.stringify(rule.regla_estandarizada, null, 2);
+            } else {
+              reglaText = String(rule.regla_estandarizada);
+            }
+          } catch (e) {
+            reglaText = String(rule.regla_estandarizada);
+          }
+
+          // Use monospace for structured content (JSON or XML) and allow wrapping
+          doc.fontSize(10).font('Helvetica-Bold').text('Regla Generada (completa):', 70, currentY);
+          doc.moveDown(0.2);
+          doc.fontSize(9).font('Courier');
+
+          // If the content is very long, PDFKit will wrap it; ensure we respect page bounds
+          const textLines = reglaText.split(/\r?\n/);
+          textLines.forEach(line => {
+            if (doc.y > 700) doc.addPage();
+            doc.text(line, { indent: 10, width: 460 });
+          });
+
+          // Restore font
+          doc.font('Helvetica');
+          currentY = doc.y + 5;
+        } else if (rule.resumen) {
           const resumenText = String(rule.resumen).length > 300 
             ? String(rule.resumen).substring(0, 300) + '...'
             : String(rule.resumen);

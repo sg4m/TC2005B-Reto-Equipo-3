@@ -1379,9 +1379,9 @@ const Reglas = () => {
           </Box>
         </DialogTitle>
         
-        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        <DialogContent sx={{ p: 0, overflow: 'auto' }}>
           {selectedRule && (
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, pb: 10 }}>
               {/* Header Info Section */}
               <Box sx={{ 
                 mb: 4, 
@@ -1543,16 +1543,20 @@ const Reglas = () => {
                 <TextField
                   fullWidth
                   multiline
-                  rows={4}
+                  rows={6}
                   label="Descripción"
-                  value={isEditing ? editedRule.descripcion || '' : selectedRule.descripcion}
+                  value={isEditing ? editedRule.descripcion || '' : (
+                    // If regla_estandarizada.xml exists, show it; otherwise show descripcion
+                    selectedRule?.regla_estandarizada?.xml || selectedRule.descripcion || ''
+                  )}
                   onChange={(e) => isEditing && handleInputChange('descripcion', e.target.value)}
                   disabled={!isEditing}
                   variant="outlined"
                   sx={{ 
                     '& .MuiInputBase-root': {
                       fontSize: '0.95rem',
-                      lineHeight: 1.5
+                      lineHeight: 1.3,
+                      fontFamily: 'monospace'
                     }
                   }}
                 />

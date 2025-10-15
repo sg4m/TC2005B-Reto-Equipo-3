@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import authService from '../services/authService';
-import { rulesService } from '../services/api';
+import { rulesService, aiService } from '../services/api';
 import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import simulationService from '../services/simulationService';
@@ -320,14 +320,14 @@ const Simulador = () => {
   const validateAndSetFile = (file) => {
     if (!file) return;
 
-    // Validate file type (CSV, JSON, TXT)
-    const allowedTypes = ['text/csv', 'application/json', 'text/plain'];
-    const allowedExtensions = ['.csv', '.json', '.txt'];
+    // Validate file type (TXT, XML)
+    const allowedTypes = ['text/plain', 'text/xml', 'application/xml'];
+    const allowedExtensions = ['.txt', '.xml'];
     const hasValidType = allowedTypes.includes(file.type);
     const hasValidExtension = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (!hasValidType && !hasValidExtension) {
-      showError('Solo se permiten archivos CSV, JSON o TXT');
+      showError('Solo se permiten archivos TXT o XML');
       return;
     }
 
@@ -341,6 +341,7 @@ const Simulador = () => {
     setSimulationResults(null);
     setSimulationError(null);
     showSuccess(`Archivo "${file.name}" cargado exitosamente`);
+  showSuccess(`Archivo "${file.name}" cargado exitosamente`);
   };
 
   const handleFileRemove = () => {
@@ -385,14 +386,52 @@ const Simulador = () => {
       let result;
       
       if (testInputType === 0) {
-        // Text simulation
-        result = await simulationService.simulateWithText(selectedRule.id_regla, testText);
+        // Use AI mapping endpoint for text input (treat as file content)
+        const currentUser = authService.getCurrentUser?.();
+        const fileContent = testText;
+        const fileType = 'txt';
+        const aiResp = await aiService.processPaymentMapping({ fileContent, fileType, fileName: 'input_text' });
+        setSimulationResults({ xml: aiResp?.xml, validation: aiResp?.validation, processing_notes: aiResp?.processing_notes });
+
+        // Persist simulation to history
+        try {
+          await simulationService.saveSimulation({
+            ruleId: selectedRule?.id_regla,
+            inputType: 'text',
+            inputData: fileContent,
+            fileName: 'input_text',
+            aiResponse: aiResp
+          });
+          addNotification({ type: 'success', title: 'Simulación guardada', message: `Simulación de regla ${selectedRule?.id_display || selectedRule?.id_regla} guardada en el historial` });
+        } catch (saveErr) {
+          console.error('Error saving simulation:', saveErr);
+          showWarning('La simulación no pudo guardarse en el historial');
+        }
+
       } else {
-        // File simulation
-        result = await simulationService.simulateWithFile(selectedRule.id_regla, selectedFile);
+        // File simulation: read file content and call AI mapping
+        const fileText = await selectedFile.text();
+        const ext = selectedFile.name.split('.').pop().toLowerCase();
+        const fileType = ext === 'xml' ? 'xml' : 'txt';
+        const aiResp = await aiService.processPaymentMapping({ fileContent: fileText, fileType, fileName: selectedFile.name });
+        setSimulationResults({ xml: aiResp?.xml, validation: aiResp?.validation, processing_notes: aiResp?.processing_notes });
+
+        // Persist simulation to history
+        try {
+          await simulationService.saveSimulation({
+            ruleId: selectedRule?.id_regla,
+            inputType: 'file',
+            inputData: fileText,
+            fileName: selectedFile.name,
+            aiResponse: aiResp
+          });
+          addNotification({ type: 'success', title: 'Simulación guardada', message: `Simulación de regla ${selectedRule?.id_display || selectedRule?.id_regla} guardada en el historial` });
+        } catch (saveErr) {
+          console.error('Error saving simulation:', saveErr);
+          showWarning('La simulación no pudo guardarse en el historial');
+        }
       }
 
-      setSimulationResults(result);
       showSuccess('Simulación completada exitosamente');
       
       addNotification({
@@ -1234,7 +1273,7 @@ Monto: $1000, Tipo: Transferencia, País: México, Historial: Bueno`}
                       )}
 
                       {/* Recommendations */}
-                      {simulationResults.recommendations && (
+                        {simulationResults.recommendations && (
                         <Box>
                           <Typography variant="body1" sx={{ fontWeight: 600, mb: 2 }}>
                             Recomendaciones:
@@ -1244,6 +1283,20 @@ Monto: $1000, Tipo: Transferencia, País: México, Historial: Bueno`}
                               {simulationResults.recommendations}
                             </Typography>
                           </Alert>
+                        </Box>
+                      )}
+
+                      {/* Mapped XML (if returned) */}
+                      {simulationResults.xml && (
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600, mb: 2 }}>
+                            XML mapeado por IA:
+                          </Typography>
+                          <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e9ecef', overflowX: 'auto' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                              {simulationResults.xml}
+                            </Typography>
+                          </Paper>
                         </Box>
                       )}
                     </Paper>
