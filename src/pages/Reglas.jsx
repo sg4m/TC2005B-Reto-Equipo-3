@@ -293,6 +293,70 @@ const Reglas = () => {
     }
   };
 
+  // Export Gemini returned rule (prefer XML). Small utility to download the XML returned by Gemini.
+  const handleExportGeminiXML = () => {
+    if (!selectedRule?.regla_estandarizada) {
+      showWarning?.('No hay contenido para exportar');
+      return;
+    }
+
+    let content = '';
+    const g = selectedRule.regla_estandarizada;
+    try {
+      if (typeof g === 'string') {
+        content = g;
+      } else if (typeof g === 'object') {
+        // Prefer an 'xml' property if present
+        if (g.xml) content = g.xml;
+        else content = JSON.stringify(g, null, 2);
+      } else {
+        content = String(g);
+      }
+    } catch (e) {
+      content = String(g || '');
+    }
+
+    // Remove code fence if present
+    content = content.replace(/```(?:xml)?\n([\s\S]*?)```/i, '$1').trim();
+
+    // Try to extract only the XML part. Prefer <MappedPayment>...</MappedPayment>
+    let xmlOnly = '';
+    const mappedMatch = content.match(/<MappedPayment[\s\S]*?<\/MappedPayment>/i);
+    if (mappedMatch) {
+      xmlOnly = mappedMatch[0];
+    } else {
+      // Fallback: extract the first well-formed XML element (simple heuristic)
+      const anyXmlMatch = content.match(/<([A-Za-z][A-Za-z0-9:_-]*)(?:\s[^>]*)?>[\s\S]*?<\/\1>/);
+      if (anyXmlMatch) xmlOnly = anyXmlMatch[0];
+      else xmlOnly = '';
+    }
+
+    if (!xmlOnly) {
+      showWarning?.('No se encontró contenido XML en la respuesta de la IA');
+      return;
+    }
+
+    content = xmlOnly.trim();
+
+    const blob = new Blob([content], { type: 'application/xml' });
+    const filename = `regla_${selectedRule?.id_regla || selectedRule?.id || selectedRule?.id_display || 'export'}_gemini.xml`;
+
+    if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+      window.navigator.msSaveOrOpenBlob(blob, filename);
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    showSuccess?.('Descarga iniciada');
+  };
+
   const handleProfileClose = () => {
     setProfileOpen(false);
   };
@@ -1692,6 +1756,25 @@ const Reglas = () => {
             </Box>
           ) : (
             <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'flex-end' }}>
+              {selectedRule?.regla_estandarizada && (
+                <Button
+                  onClick={handleExportGeminiXML}
+                  startIcon={<DownloadIcon />}
+                  variant="outlined"
+                  sx={{
+                    borderColor: '#1976d2',
+                    color: '#1976d2',
+                    px: 3,
+                    py: 1.5,
+                    fontWeight: 500,
+                    '&:hover': {
+                      backgroundColor: 'rgba(25,118,210,0.04)'
+                    }
+                  }}
+                >
+                  Exportar XML
+                </Button>
+              )}
               <Button
                 onClick={handleCloseModal}
                 variant="outlined"
