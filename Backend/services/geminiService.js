@@ -27,7 +27,7 @@ class GeminiService {
     async generateBusinessRulesFromPrompt(prompt) {
         try {
             const systemPrompt = `
-Eres un experto en reglas de negocio para el banco Banorte. Genera reglas de negocio comprensivas y accionables basadas en los requerimientos del usuario.
+Eres un experto en reglas de negocio para el banco. Genera reglas de negocio comprensivas y accionables basadas en los requerimientos del usuario.
 
 Por favor, formatea tu respuesta como un objeto JSON con esta estructura:
 {
@@ -48,7 +48,7 @@ Por favor, formatea tu respuesta como un objeto JSON con esta estructura:
 
 Solicitud del Usuario: ${prompt}
 
-Genera reglas de negocio prácticas que Banorte pueda implementar para operaciones bancarias, cumplimiento normativo, gestión de riesgos o servicio al cliente.
+Genera reglas de negocio prácticas que el banco pueda implementar para operaciones bancarias, cumplimiento normativo, gestión de riesgos o servicio al cliente.
 Usa IDs temporales como "temp_rule_1", "temp_rule_2", etc. - serán actualizados con IDs de base de datos después.
 IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títulos, descripciones y comentarios.
 `;
@@ -101,7 +101,7 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
             console.log(`[processPaymentMapping] Tamaño del contenido: ${fileContent ? fileContent.length : 0} caracteres`);
 
             // Construir prompt que pide SOLO el XML mapeado
-            const systemPrompt = `Eres un experto en procesamiento de pagos bancarios para Banorte.
+            const systemPrompt = `Eres un experto en procesamiento de pagos bancarios.
 
 TAREA: A partir del archivo de entrada proporcionado, extrae los campos necesarios y genera ÚNICAMENTE un XML mapeado con la siguiente estructura:
 
@@ -116,7 +116,7 @@ TAREA: A partir del archivo de entrada proporcionado, extrae los campos necesari
 </MappedPayment>
 
 Reglas resumen:
-- OPERACION: 2 dígitos según tipo de cuenta destino y fecha (02,04,05 según reglas de Banorte).
+- OPERACION: 2 dígitos según tipo de cuenta destino y fecha (02,04,05 según reglas del banco).
 - CTA_ORIGENOR: 20 dígitos, justificar derecha con ceros.
 - CTA_DESTINO: 20 dígitos; si origen es Cheques (10) construir CLABE según reglas; si CLABE 072/032 aplicar extracción indicada; otherwise rellenar con ceros a la derecha hasta 20.
 - IMPORTE: 14 dígitos (12 enteros + 2 decimales), justificar derecha con ceros.
@@ -183,7 +183,7 @@ ${fileContent}
     async refineBusinessRules(existingRules, feedback) {
         try {
             const systemPrompt = `
-Eres un experto en reglas de negocio para el banco Banorte. Refina las reglas de negocio existentes basado en la retroalimentación del usuario.
+Eres un experto en reglas de negocio para el banco. Refina las reglas de negocio existentes basado en la retroalimentación del usuario.
 
 Reglas Actuales: ${JSON.stringify(existingRules, null, 2)}
 
@@ -225,7 +225,7 @@ IMPORTANTE: Responde ÚNICAMENTE en español, incluidos todos los textos, títul
     async continueConversation(userMessage, conversationHistory = []) {
         try {
             const systemPrompt = `
-Eres un experto consultor en reglas de negocio para el banco Banorte. Tu trabajo es hacer preguntas específicas y detalladas para entender completamente los requerimientos antes de generar las reglas finales.
+Eres un experto consultor en reglas de negocio para el banco. Tu trabajo es hacer preguntas específicas y detalladas para entender completamente los requerimientos antes de generar las reglas finales.
 
 IMPORTANTE: NO generes reglas de negocio todavía. Tu objetivo es hacer preguntas para clarificar y refinar los requerimientos.
 
@@ -296,7 +296,7 @@ RESPONDE ÚNICAMENTE en español y mantén un tono profesional pero amigable.
     async generateSummaryFromRules(businessRulesJSON) {
         try {
             const systemPrompt = `
-Eres un experto en reglas de negocio para el banco Banorte. Genera un resumen conciso y claro de las reglas de negocio proporcionadas.
+Eres un experto en reglas de negocio para el banco. Genera un resumen conciso y claro de las reglas de negocio proporcionadas.
 
 Reglas Completas: ${JSON.stringify(businessRulesJSON, null, 2)}
 
@@ -354,7 +354,7 @@ Responde ÚNICAMENTE con el resumen, sin formato JSON ni texto adicional.
             }
 
             const systemPrompt = `
-Eres un experto analista de reglas de negocio para el banco Banorte. Tu tarea es simular y evaluar el comportamiento de una regla de negocio específica con los datos de prueba proporcionados.
+Eres un experto analista de reglas de negocio para el banco. Tu tarea es simular y evaluar el comportamiento de una regla de negocio específica con los datos de prueba proporcionados.
 
 INFORMACIÓN DE LA REGLA:
 - ID: ${rule.id}

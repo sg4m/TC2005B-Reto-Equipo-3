@@ -209,7 +209,13 @@ const Reglas = () => {
   // Funciones para el modal de detalles
   const handleViewDetails = (rule) => {
     setSelectedRule(rule);
-    setEditedRule({ ...rule });
+    setEditedRule({
+      regla_estandarizada: rule.regla_estandarizada?.xml || '', // Set XML content for editing
+      monto_minimo: rule.monto_minimo,
+      monto_maximo: rule.monto_maximo,
+      region: rule.region,
+      tipo_transaccion: rule.tipo_transaccion
+    });
     setIsEditing(false);
     setOpenModal(true);
   };
@@ -229,19 +235,38 @@ const Reglas = () => {
   };
 
   const handleInputChange = (field, value) => {
-    setEditedRule(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setEditedRule(prev => {
+      if (field === 'regla_estandarizada') {
+        return {
+          ...prev,
+          regla_estandarizada: {
+            ...prev.regla_estandarizada,
+            xml: value // Update only the XML content
+          }
+        };
+      }
+      return {
+        ...prev,
+        [field]: value
+      };
+    });
   };
 
   const handleSaveChanges = async () => {
     try {
+      // Validar y estructurar el objeto editedRule antes de enviarlo
+      const formattedRule = {
+        ...editedRule,
+        regla_estandarizada: {
+          xml: editedRule.regla_estandarizada?.xml || ''
+        }
+      };
+
       // Llamar al API para actualizar la regla
-      await rulesService.updateRule(selectedRule.id_regla, editedRule);
+      await rulesService.updateRule(selectedRule.id_regla, formattedRule);
       
       // Actualizar la regla seleccionada
-      setSelectedRule({ ...editedRule });
+      setSelectedRule({ ...formattedRule });
       setIsEditing(false);
       
       // Refrescar la lista de reglas
@@ -845,14 +870,10 @@ const Reglas = () => {
                                     sx={{ 
                                       maxWidth: '200px',
                                       overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                    title={rule.descripcion}
-                                  >
+                                      textOverflow: 'ellipsis'
+                                    }}>
                                     {rule.descripcion}
                                   </Typography>
-                                  
                                   {hoveredRow === rule.id_regla && (
                                     <Tooltip title="Ver detalles">
                                       <IconButton
@@ -1609,11 +1630,15 @@ const Reglas = () => {
                   multiline
                   rows={6}
                   label="Descripción"
-                  value={isEditing ? editedRule.descripcion || '' : (
-                    // If regla_estandarizada.xml exists, show it; otherwise show descripcion
-                    selectedRule?.regla_estandarizada?.xml || selectedRule.descripcion || ''
+                  value={isEditing ? editedRule.regla_estandarizada?.xml || '' : (
+                    selectedRule?.regla_estandarizada?.xml || ''
                   )}
-                  onChange={(e) => isEditing && handleInputChange('descripcion', e.target.value)}
+                  onChange={(e) => {
+                    if (isEditing) {
+                      const updatedXML = e.target.value;
+                      handleInputChange('regla_estandarizada', updatedXML);
+                    }
+                  }}
                   disabled={!isEditing}
                   variant="outlined"
                   sx={{ 
