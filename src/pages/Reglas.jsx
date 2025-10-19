@@ -4,6 +4,7 @@ import { rulesService } from '../services/api';
 import { useNotification } from '../hooks/useNotification';
 import { useGlobalNotifications } from '../hooks/useGlobalNotifications.jsx';
 import { useBusinessRules } from '../hooks/useBusinessRules';
+import { generateTrama } from '../services/tramaService';
 import {
   Box, Typography, Button, IconButton,
   Drawer, List, ListItem, ListItemButton, ListItemText,
@@ -546,6 +547,29 @@ const Reglas = () => {
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
+
+  const handleDownloadTrama = () => {
+    try {
+      // Validar que selectedRule.regla_estandarizada tenga la estructura esperada
+      if (!selectedRule || !selectedRule.regla_estandarizada) {
+        throw new Error('La regla seleccionada no contiene datos válidos para generar la trama.');
+      }
+
+      const trama = generateTrama(selectedRule.regla_estandarizada);
+      const blob = new Blob([trama], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `trama_${selectedRule.id_regla || 'export'}.txt`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating trama:', error);
+      showError(error.message || 'Error al generar la trama');
+    }
+  };
 
   return (
     <Box sx={{
@@ -1800,6 +1824,24 @@ const Reglas = () => {
                   Exportar XML
                 </Button>
               )}
+              <Button
+                onClick={handleDownloadTrama}
+                variant="contained"
+                startIcon={<DownloadIcon />}
+                sx={{
+                  bgcolor: '#1976D2',
+                  px: 2,
+                  py: 1,
+                  fontWeight: 600,
+                  boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    bgcolor: '#1565C0',
+                    boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)'
+                  }
+                }}
+              >
+                Descargar Trama
+              </Button>
               <Button
                 onClick={handleCloseModal}
                 variant="outlined"
